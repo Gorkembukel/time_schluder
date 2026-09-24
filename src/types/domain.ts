@@ -63,6 +63,8 @@ export interface TaskDependency {
   lagMinutes: number
 }
 
+export type DetailLevel = 'detailed' | 'rough'
+
 export interface Task {
   id: string
   title: string
@@ -75,7 +77,7 @@ export interface Task {
   status: 'planned' | 'in-progress' | 'done' | 'delayed'
   dependencies: TaskDependency[]
   bufferMinutes: number
-  detailLevel: 'detailed' | 'rough'
+  detailLevel: DetailLevel
 }
 
 export interface FxSnapshot {

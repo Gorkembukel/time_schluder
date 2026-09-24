@@ -1,3 +1,5 @@
 export * from './types'
 export { buildGraph, detectCycle, topologicalSort } from './dependencyGraph'
 export { computeCriticalPath } from './criticalPath'
+export { determineDetailLevel, evaluateRollingWave } from './rollingWave'
+export type { RollingWaveItem, RollingWaveTransition } from './rollingWave'
