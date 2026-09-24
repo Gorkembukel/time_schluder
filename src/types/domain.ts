@@ -111,4 +111,6 @@ export interface FinanceCategory {
   parentCategoryId?: string
   order: number
   isDefault: boolean
+  /** Aylık bütçe hedefi (TRY) — yalnızca gider kategorilerinde anlamlı, opsiyonel */
+  monthlyBudgetTRY?: number
 }

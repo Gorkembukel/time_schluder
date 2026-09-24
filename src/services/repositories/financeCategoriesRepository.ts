@@ -3,6 +3,7 @@ import {
   doc,
   onSnapshot,
   runTransaction,
+  updateDoc,
   writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore'
@@ -40,6 +41,16 @@ export async function seedDefaultFinanceCategoriesIfMissing(uid: string): Promis
     batch.set(doc(colRef), category)
   }
   await batch.commit()
+}
+
+export async function updateCategoryBudget(
+  uid: string,
+  categoryId: string,
+  monthlyBudgetTRY: number | null,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', uid, 'financeCategories', categoryId), {
+    monthlyBudgetTRY: monthlyBudgetTRY ?? undefined,
+  })
 }
 
 export function subscribeFinanceCategories(

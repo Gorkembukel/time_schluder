@@ -7,6 +7,7 @@ import { deleteTransaction } from '../../services/repositories/financeTransactio
 import { formatTRY } from '../../lib/format'
 import { TransactionForm } from './TransactionForm'
 import { MagnitudeBreakdown, type BreakdownItem } from './MagnitudeBreakdown'
+import { BudgetComparison } from './BudgetComparison'
 import type { FinanceTransaction } from '../../types/domain'
 
 const ISO_MONTH_LENGTH = 7
@@ -65,6 +66,8 @@ export function FinansPage() {
           emptyText="Bu ay hiçbir işlem bir hayat alanına bağlanmadı."
         />
       </div>
+
+      <BudgetComparison categories={categories} monthExpenses={monthExpenses} />
 
       <div className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-semibold text-text">Son işlemler</h2>

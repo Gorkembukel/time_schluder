@@ -1,6 +1,8 @@
 import type { ChangeEvent, ReactNode } from 'react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
+import { updateCategoryBudget } from '../../services/repositories/financeCategoriesRepository'
+import { useUid } from '../../app/UidContext'
 import { PLANNING_SCALES, type PlanningScale, type Theme } from '../../types/domain'
 
 const SCALE_LABELS: Record<PlanningScale, string> = {
@@ -50,6 +52,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text'
 
 export function AyarlarPage() {
+  const uid = useUid()
   const settings = useSettingsStore((s) => s.settings)
   const loading = useSettingsStore((s) => s.loading)
   const update = useSettingsStore((s) => s.update)
@@ -228,6 +231,31 @@ export function AyarlarPage() {
         <p className="text-sm text-text-secondary">
           Kategori ekleme/düzenleme Finans ekranından yapılır.
         </p>
+      </Section>
+
+      <Section title="Finans — Bütçe (aylık, TRY)">
+        {categories.filter((c) => c.kind === 'expense').length === 0 ? (
+          <p className="text-sm text-text-secondary">Kategoriler yükleniyor…</p>
+        ) : (
+          categories
+            .filter((c) => c.kind === 'expense')
+            .map((category) => (
+              <Field key={category.id} label={category.name}>
+                <input
+                  type="number"
+                  min={0}
+                  step="50"
+                  placeholder="belirlenmedi"
+                  defaultValue={category.monthlyBudgetTRY ?? ''}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim()
+                    void updateCategoryBudget(uid, category.id, value === '' ? null : Number(value))
+                  }}
+                  className={inputClass}
+                />
+              </Field>
+            ))
+        )}
       </Section>
 
       <Section title="Veri & Hesap">
