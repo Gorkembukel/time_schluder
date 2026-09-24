@@ -1,8 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import { endOfDay, startOfDay } from 'date-fns'
 import { Plus } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useRequirements } from '../../hooks/useRequirements'
+import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
+import { effectiveLifeAreaId, overlapsRange } from '../../lib/taskHierarchy'
+import { PLANNING_SCALE_LABELS, type PlanningScale } from '../../types/domain'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { createTask } from '../../services/repositories/tasksRepository'
 import { determineDetailLevel } from '../../lib/planning-engine'
@@ -12,6 +16,8 @@ import { Button } from '../../components/Button'
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1.5 text-sm text-text'
 const DEFAULT_START_TIME = '09:00'
 const DEFAULT_END_TIME = '10:00'
+/** Günlük görevin bağlanabileceği üst ölçekler (Story/Task seviyesi), yakından uzağa. */
+const PARENT_SCALES: PlanningScale[] = ['day', 'week', 'month']
 
 export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCreated: () => void }) {
   const uid = useUid()
@@ -24,9 +30,21 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
   const [endTime, setEndTime] = useState(DEFAULT_END_TIME)
   const [lifeAreaId, setLifeAreaId] = useState('')
   const [requirementId, setRequirementId] = useState('')
+  const [parentId, setParentId] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const { requirements } = useRequirements(uid, lifeAreaId)
+  const { tasks, index } = useTaskHierarchy()
+  const parent = parentId ? index.get(parentId) : undefined
+  const inheritedAreaId = parent ? effectiveLifeAreaId(parent, index) : undefined
+  const inheritedAreaName = areas.find((a) => a.id === inheritedAreaId)?.name
+  const areaIdForRequirements = lifeAreaId || inheritedAreaId || ''
+  const { requirements } = useRequirements(uid, areaIdForRequirements)
+
+  const dayStart = startOfDay(new Date(`${date}T00:00:00`))
+  const dayEnd = endOfDay(dayStart)
+  const parentCandidates = tasks
+    .filter((t) => PARENT_SCALES.includes(t.scale) && overlapsRange(t, dayStart, dayEnd))
+    .sort((a, b) => PARENT_SCALES.indexOf(a.scale) - PARENT_SCALES.indexOf(b.scale))
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -45,6 +63,7 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
       scale: 'hour',
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
+      parentTaskId: parentId || undefined,
       lifeAreaId: lifeAreaId || undefined,
       requirementId: requirementId || undefined,
       bufferMinutes: 0,
@@ -101,6 +120,24 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-text-secondary">
+        Üst iş
+        <select
+          value={parentId}
+          onChange={(e) => {
+            setParentId(e.target.value)
+            setRequirementId('')
+          }}
+          className={inputClass}
+        >
+          <option value="">—</option>
+          {parentCandidates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {PLANNING_SCALE_LABELS[t.scale]}: {t.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-text-secondary">
         Hayat alanı
         <select
           value={lifeAreaId}
@@ -110,7 +147,7 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
           }}
           className={inputClass}
         >
-          <option value="">—</option>
+          <option value="">{inheritedAreaName ? `Devral: ${inheritedAreaName}` : '—'}</option>
           {areas.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}
@@ -123,7 +160,7 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
         <select
           value={requirementId}
           onChange={(e) => setRequirementId(e.target.value)}
-          disabled={!lifeAreaId}
+          disabled={!areaIdForRequirements}
           className={inputClass}
         >
           <option value="">—</option>

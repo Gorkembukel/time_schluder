@@ -74,15 +74,20 @@ export interface TaskDependency {
 
 export type DetailLevel = 'detailed' | 'rough'
 
-export const TASK_STATUSES = ['planned', 'in-progress', 'done', 'delayed'] as const
+/**
+ * İş akışı (workflow) durumları — Kanban panosunun kolonlarıdır (bkz. .claude/personas/jira-developer.md).
+ * "Gecikti" bir durum değildir: bitiş tarihi geçmiş ve tamamlanmamış işlerde `isOverdue` ile hesaplanan bir işarettir.
+ */
+export const TASK_STATUSES = ['planned', 'in-progress', 'done'] as const
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   planned: 'Planlandı',
   'in-progress': 'Devam ediyor',
   done: 'Tamamlandı',
-  delayed: 'Gecikti',
 }
+
+export const OVERDUE_LABEL = 'Gecikti'
 
 export interface Task {
   id: string

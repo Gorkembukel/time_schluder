@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { UidProvider } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { HayatAlanlariPage } from './HayatAlanlariPage'
@@ -23,9 +24,11 @@ import { createLifeArea } from '../../services/repositories/lifeAreasRepository'
 
 function renderPage() {
   return render(
-    <UidProvider uid="test-uid">
-      <HayatAlanlariPage />
-    </UidProvider>,
+    <MemoryRouter>
+      <UidProvider uid="test-uid">
+        <HayatAlanlariPage />
+      </UidProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -50,9 +53,7 @@ describe('HayatAlanlariPage', () => {
 
   it('mevcut alanları listeler', () => {
     useLifeAreasStore.setState({
-      areas: [
-        { id: 'a1', name: 'Mühendislik', order: 0, createdAt: '', updatedAt: '' },
-      ],
+      areas: [{ id: 'a1', name: 'Mühendislik', order: 0, createdAt: '', updatedAt: '' }],
       loading: false,
       uid: 'test-uid',
       unsubscribe: null,
