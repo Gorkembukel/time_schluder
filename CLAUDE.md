@@ -6,12 +6,17 @@ Asıl kaynağın **zaman** olduğu kişisel kaynak yönetimi web uygulaması. 3 
 Detaylı ürün tanımı: [`docs/requirements.md`](docs/requirements.md). Kavramlar: [`docs/domain-glossary.md`](docs/domain-glossary.md). Mimari kararlar: [`docs/decisions/`](docs/decisions/).
 
 ## Durum
-Proje **Faz 0** (altyapı) aşamasında. Teknoloji yığını, klasör yapısı ve Firestore veri modeli henüz seçilmedi — bunlar Faz 2'de **Web Developer** personası tarafından gerekçeli olarak önerilecek ve ADR olarak `docs/decisions/` altına kaydedilecek.
+Proje **Faz 2** (mimari) aşamasında; Faz 0 (altyapı) ve Faz 1 (keşif) tamamlandı. Mimari kararlar `docs/decisions/0001`–`0006` içinde ADR olarak önerildi (durum: onay bekliyor). Kod iskeleti henüz kurulmadı — bu Faz 3'te yapılacak.
 
-Öneri (henüz onaylanmadı): Vite + React + TypeScript, statik hosting GitHub Pages, backend Firebase Spark (ücretsiz) plan — Firestore + Auth, Cloud Functions **yok** (tüm hesaplama istemci tarafında).
+**Seçilen/önerilen yığın** (bkz. ADR 0001): Vite + React + TypeScript, Zustand, React Router (`HashRouter`), Tailwind CSS + CSS custom property tema token'ları, date-fns, Vitest + React Testing Library + Playwright. Yayın: GitHub Pages + GitHub Actions (`actions/deploy-pages`). Backend: Firebase Spark (ücretsiz) — Firestore + Auth, Cloud Functions **yok** (tüm hesaplama istemci tarafında).
 
 ## Komutlar
-> Faz 2'de proje iskeleti kurulunca bu bölüm dev/build/test/lint/deploy komutlarıyla doldurulacak.
+> Faz 3'te proje iskeleti kurulunca gerçek script'lerle güncellenecek. Planlanan (ADR 0001, 0005):
+> - `npm run dev` — yerel geliştirme sunucusu
+> - `npm run build` — üretim derlemesi (GitHub Pages `base: /time_schluder/`)
+> - `npm run lint` — ESLint
+> - `npm run test` — Vitest (unit/component)
+> - `npm run test:e2e` — Playwright
 
 ## Git akışı
 - Her değişiklikten önce `git-checkpoint` skill'i ile mevcut durum korunur (commit + push), sonra yeni branch açılır.
@@ -29,7 +34,7 @@ Her görevden önce uygun persona belirlenir ve kısaca bildirilir. Varsayılan:
 - Her değişiklikten sonra, commit'ten önce `config-audit` skill'i çalıştırılır ve raporu PR açıklamasına eklenir.
 
 ## Firebase ücretsiz (Spark) plan sınırları
-> Güncel kota değerleri Faz 2'de doğrulanıp buraya ve `docs/decisions/`'a yazılacak. Genel ilke: gereksiz okuma yapma, offline persistence ve cache kullan, toplu yazma (batch) tercih et, Cloud Functions kullanma (Spark planda yok).
+Firebase resmi fiyatlandırma sayfasından doğrulandı (2026-09-24, bkz. ADR 0003): Firestore — 1 GiB depolama, 10 GiB/ay ağ çıkışı, 20.000 yazma/gün, 50.000 okuma/gün, 20.000 silme/gün. Authentication — 50.000 MAU'ya kadar ücretsiz. Tek kullanıcılı kullanım için rahat yeterli; risk yalnızca hatalı/döngüsel `onSnapshot` dinleyicileridir. İlke: gereksiz okuma yapma, offline persistence ve cache kullan, toplu yazma (batch) tercih et, Cloud Functions kullanma (Spark planda yok), sorguları `limit()` ile sınırla.
 
 ## Referanslar
 - Skill'ler: `.claude/skills/` (`git-checkpoint`, `pull-request`, `persona-builder`, `config-audit`)
