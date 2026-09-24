@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Layers, Plus, Trash2 } from 'lucide-react'
-import { deleteLifeArea, renameLifeArea } from '../../services/repositories/lifeAreasRepository'
+import {
+  deleteLifeArea,
+  renameLifeArea,
+  updateLifeAreaPriority,
+} from '../../services/repositories/lifeAreasRepository'
 import {
   createRequirement,
   deleteRequirement,
@@ -11,8 +15,11 @@ import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
 import { effectiveRequirementId } from '../../lib/taskHierarchy'
 import { AreaGoals } from './AreaGoals'
 import {
+  LIFE_AREA_PRIORITIES,
+  LIFE_AREA_PRIORITY_LABELS,
   REQUIREMENT_TYPES,
   REQUIREMENT_TYPE_LABELS,
+  type LifeAreaPriority,
   type LifeArea,
   type Requirement,
   type RequirementType,
@@ -73,6 +80,22 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
             {area.name}
           </button>
         )}
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-text-secondary">
+          Öncelik
+          <select
+            value={area.priority ?? 'normal'}
+            onChange={(e) =>
+              void updateLifeAreaPriority(uid, area.id, e.target.value as LifeAreaPriority)
+            }
+            className={inputClass}
+          >
+            {LIFE_AREA_PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {LIFE_AREA_PRIORITY_LABELS[p]}
+              </option>
+            ))}
+          </select>
+        </label>
         {confirmingDelete ? (
           <div className="flex items-center gap-1 text-xs">
             <span className="text-text-secondary">Emin misin?</span>

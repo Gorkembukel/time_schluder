@@ -10,6 +10,7 @@ import { DayAgenda } from './DayAgenda'
 import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
 import { HorizonBoard } from './HorizonBoard'
+import { GuidancePanel } from '../rehber/GuidancePanel'
 
 type ViewMode = 'day' | 'week' | 'month' | 'year' | 'year3'
 
@@ -106,6 +107,13 @@ export function TakvimPage() {
           </>
         }
       />
+
+      {view !== 'day' && (
+        <GuidancePanel
+          period={scalePeriodRange(view, referenceDate, weekStartsOn)}
+          periodScale={view}
+        />
+      )}
 
       {view === 'day' && <DayAgenda date={referenceDate} />}
       {view === 'week' && (

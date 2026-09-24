@@ -6,7 +6,13 @@ import { updateCategoryBudget } from '../../services/repositories/financeCategor
 import { useUid } from '../../app/UidContext'
 import { Skeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/PageHeader'
-import { PLANNING_SCALES, PLANNING_SCALE_LABELS, type Theme } from '../../types/domain'
+import {
+  LIFE_AREA_PRIORITIES,
+  LIFE_AREA_PRIORITY_LABELS,
+  PLANNING_SCALES,
+  PLANNING_SCALE_LABELS,
+  type Theme,
+} from '../../types/domain'
 
 const LOADING_SECTION_COUNT = 3
 
@@ -26,6 +32,8 @@ const DETAIL_WINDOW_MIN = 0
 const BUFFER_RATIO_MIN = 0
 const BUFFER_RATIO_MAX = 1
 const BUFFER_RATIO_STEP = 0.05
+const PRIORITY_WEIGHT_MIN = 0
+const PRIORITY_WEIGHT_STEP = 0.5
 const UPCOMING_WINDOW_MIN = 1
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -152,7 +160,10 @@ export function AyarlarPage() {
 
       <Section title="Planlama Motoru">
         {PLANNING_SCALES.map((scale) => (
-          <Field key={scale} label={`Detaylandırma penceresi — ${PLANNING_SCALE_LABELS[scale]} (gün)`}>
+          <Field
+            key={scale}
+            label={`Detaylandırma penceresi — ${PLANNING_SCALE_LABELS[scale]} (gün)`}
+          >
             <input
               type="number"
               min={DETAIL_WINDOW_MIN}
@@ -190,6 +201,64 @@ export function AyarlarPage() {
             }
           />
         </Field>
+        <Field label="Planlanabilir oran (günün hedeflere ayrılabilen kısmı)">
+          <input
+            type="number"
+            min={BUFFER_RATIO_MIN}
+            max={BUFFER_RATIO_MAX}
+            step={BUFFER_RATIO_STEP}
+            className={inputClass}
+            value={settings.planningEngine.plannableRatio}
+            onChange={(e) =>
+              void update({
+                planningEngine: {
+                  ...settings.planningEngine,
+                  plannableRatio: Number(e.target.value),
+                },
+              })
+            }
+          />
+        </Field>
+        <Field label="Sapma uyarı eşiği (forecast)">
+          <input
+            type="number"
+            min={BUFFER_RATIO_MIN}
+            max={BUFFER_RATIO_MAX}
+            step={BUFFER_RATIO_STEP}
+            className={inputClass}
+            value={settings.planningEngine.forecastDeviationThreshold}
+            onChange={(e) =>
+              void update({
+                planningEngine: {
+                  ...settings.planningEngine,
+                  forecastDeviationThreshold: Number(e.target.value),
+                },
+              })
+            }
+          />
+        </Field>
+        {LIFE_AREA_PRIORITIES.map((priority) => (
+          <Field key={priority} label={`Öncelik ağırlığı — ${LIFE_AREA_PRIORITY_LABELS[priority]}`}>
+            <input
+              type="number"
+              min={PRIORITY_WEIGHT_MIN}
+              step={PRIORITY_WEIGHT_STEP}
+              className={inputClass}
+              value={settings.planningEngine.priorityWeights[priority]}
+              onChange={(e) =>
+                void update({
+                  planningEngine: {
+                    ...settings.planningEngine,
+                    priorityWeights: {
+                      ...settings.planningEngine.priorityWeights,
+                      [priority]: Number(e.target.value),
+                    },
+                  },
+                })
+              }
+            />
+          </Field>
+        ))}
       </Section>
 
       <Section title="Görünüm & Tema">

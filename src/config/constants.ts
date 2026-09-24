@@ -5,7 +5,7 @@
  * Buradaki değerler yalnızca ilk kurulum / Ayarlar sayfası varsayılanlarıdır —
  * gerçek değerler kullanıcı ayarlarından (Firestore) okunur.
  */
-import type { PlanningScale, Theme } from '../types/domain'
+import type { LifeAreaPriority, PlanningScale, Theme } from '../types/domain'
 
 export interface Settings {
   general: {
@@ -22,6 +22,12 @@ export interface Settings {
     /** Rolling wave detaylandırma penceresi (gün cinsinden). Kullanıcı onboarding'de değiştirir. */
     detailWindowDays: Record<PlanningScale, number>
     bufferRatio: number
+    /** Gün başlangıç–bitiş arasındaki sürenin hedeflere ayrılabilecek oranı (kapasite = gün × saat × bu oran). */
+    plannableRatio: number
+    /** Forecast sapmasının uyarıya dönüştüğü oran (ör. 0.25 = %25 geride/ileride). */
+    forecastDeviationThreshold: number
+    /** Backcast'te hayat alanı önceliğinin ağırlık çarpanı. */
+    priorityWeights: Record<LifeAreaPriority, number>
     majorChangeThreshold: {
       affectedTaskCount: number
       criticalPathChanged: boolean
@@ -62,6 +68,9 @@ export const DEFAULT_SETTINGS: Settings = {
       hour: 0,
     },
     bufferRatio: 0.15,
+    plannableRatio: 0.35,
+    forecastDeviationThreshold: 0.25,
+    priorityWeights: { low: 0.5, normal: 1, high: 2 },
     majorChangeThreshold: {
       affectedTaskCount: 3,
       criticalPathChanged: true,

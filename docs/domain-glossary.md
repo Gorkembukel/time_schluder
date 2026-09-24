@@ -33,6 +33,10 @@ Jira eşlemesi (bkz. `.claude/personas/jira-developer.md`). Her iş bir üst öl
 | Roll-up | Üst işin ilerlemesinin alt işlerden hesaplanması (tamamlanan alt işlerin ağırlıksız ortalaması) |
 | İş akışı durumu | Planlandı → Devam ediyor → Tamamlandı; Pano'nun kolonlarıdır |
 | Gecikti | Durum değil, işarettir: bitiş tarihi geçmiş ve tamamlanmamış işlerde otomatik gösterilir |
+| Planlanabilir oran | Günün (gün başlangıç–bitiş arası) hedeflere ayrılabilen kısmı; kapasite hesabında kullanılır, Ayarlar'dan değişir |
+| Alan önceliği | Hayat alanının backcast bütçesindeki ağırlık çarpanı (Düşük/Normal/Yüksek); opsiyonel, varsayılan Normal |
+| Gerçekleşen süre | Tamamlanan işte harcanan süre; opsiyonel, girilmezse saatlik görevin planlanan süresi kullanılır |
+| Rehber | Dönemin kapasite/bütçe/gerçekleşme özetini ve somut önerileri gösteren panel (Takvim, Genel Bakış) |
 | Pano (Kanban) | İşlerin durum kolonlarında sürükle-bırak / klavye ile taşındığı görünüm |
 
 ## Görev bağımlılıkları

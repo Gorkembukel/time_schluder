@@ -11,6 +11,9 @@ vi.mock('../services/repositories/settingsRepository', () => ({
       planningEngine: {
         detailWindowDays: { year3: 365, year: 90, month: 7, week: 2, day: 1, hour: 0 },
         bufferRatio: 0.15,
+        plannableRatio: 0.35,
+        forecastDeviationThreshold: 0.25,
+        priorityWeights: { low: 0.5, normal: 1, high: 2 },
         majorChangeThreshold: { affectedTaskCount: 3, criticalPathChanged: true },
       },
       appearance: { theme: 'system' },

@@ -107,7 +107,7 @@ export async function updateTaskStatus(
 
 export type TaskFieldsUpdate = Partial<
   Pick<Task, 'title' | 'startAt' | 'endAt' | 'parentTaskId' | 'lifeAreaId' | 'requirementId'>
->
+> & { actualMinutes?: number | '' }
 
 /** Başlık/tarih/hiyerarşi alanlarını günceller. `undefined` alan dokunulmadan kalır; boş string (`''`) verilen bağlantı alanı (ör. parentTaskId) belgeden silinir. */
 export async function updateTaskFields(

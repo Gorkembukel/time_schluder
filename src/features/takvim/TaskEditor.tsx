@@ -4,15 +4,22 @@ import {
   applyTaskChanges,
   fetchAllTasks,
   updateTaskDependencies,
+  updateTaskFields,
 } from '../../services/repositories/tasksRepository'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { recalculateFromChange, type RecalculationProposal } from '../../lib/planning-engine'
 import { toDateInputValue } from '../../lib/dateInput'
 import { RecalculationPreview } from './RecalculationPreview'
-import { DEPENDENCY_TYPES, type DependencyType, type Task, type TaskDependency } from '../../types/domain'
+import {
+  DEPENDENCY_TYPES,
+  type DependencyType,
+  type Task,
+  type TaskDependency,
+} from '../../types/domain'
 import { Button } from '../../components/Button'
 
 const ICON_SIZE = 14
+const MS_PER_MINUTE = 60_000
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text'
 
@@ -47,6 +54,9 @@ export function TaskEditor({
   const [startTime, setStartTime] = useState(toTimeInputValue(new Date(task.startAt)))
   const [endTime, setEndTime] = useState(toTimeInputValue(new Date(task.endAt)))
   const [dependencies, setDependencies] = useState<TaskDependency[]>(task.dependencies)
+  const [actualMinutes, setActualMinutes] = useState(
+    task.actualMinutes !== undefined ? String(task.actualMinutes) : '',
+  )
   const [newDepTaskId, setNewDepTaskId] = useState('')
   const [newDepType, setNewDepType] = useState<DependencyType>('FS')
   const [newDepLag, setNewDepLag] = useState('0')
@@ -57,6 +67,10 @@ export function TaskEditor({
   useEffect(() => {
     fetchAllTasks(uid).then(setAllTasks)
   }, [uid])
+
+  const plannedMinutes = Math.round(
+    (new Date(task.endAt).getTime() - new Date(task.startAt).getTime()) / MS_PER_MINUTE,
+  )
 
   const candidateTasks = allTasks.filter(
     (t) => t.id !== task.id && !dependencies.some((dep) => dep.taskId === t.id),
@@ -91,6 +105,11 @@ export function TaskEditor({
 
     if (depsChanged) {
       await updateTaskDependencies(uid, task.id, dependencies)
+    }
+
+    const newActual = actualMinutes.trim() === '' ? undefined : Number(actualMinutes)
+    if (newActual !== task.actualMinutes) {
+      await updateTaskFields(uid, task.id, { actualMinutes: newActual ?? '' })
     }
 
     if (!scheduleChanged) {
@@ -180,6 +199,17 @@ export function TaskEditor({
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
             className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-text-secondary">
+          Gerçekleşen süre (dk, opsiyonel)
+          <input
+            type="number"
+            min={0}
+            value={actualMinutes}
+            onChange={(e) => setActualMinutes(e.target.value)}
+            placeholder={`Boşsa planlanan: ${plannedMinutes}`}
+            className={`${inputClass} w-44`}
           />
         </label>
       </div>

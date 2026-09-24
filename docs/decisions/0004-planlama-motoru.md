@@ -24,3 +24,11 @@ Varsayılan: bir yeniden hesaplamanın etkilediği görev sayısı ≥3 **veya**
 ## Sonuçlar
 - Tüm modüller saf fonksiyon olarak yazılacağından Vitest ile UI'sız, deterministik test edilebilir (özellikle döngü tespiti ve kritik yol için sabit örnek graflarla).
 - "Büyük değişiklik" eşiği gibi davranışsal sabitler baştan Ayarlar'a bağlanarak `config-audit`'in ilk denetim hedefi olur.
+
+## Ek: Backcast/forecast arayüz entegrasyonu (2026-09-25)
+`src/lib/capacityGuidance.ts`, `backcast.ts` ve `forecast.ts`'i kullanıcıdan yeni girdi istemeden bağlar (bkz. `.claude/personas/musteri.md`, "Minimum girdi, maksimum yönlendirme"):
+- **Kapasite** = dönemdeki gün sayısı × (gün bitiş − başlangıç saati) × `planningEngine.plannableRatio`; bundan `bufferRatio` kadar tampon düşülür.
+- **Backcast ağırlığı** = hayat alanının dönemle kesişen açık hedef sayısı (dönem ölçeği ve üstü) × `priorityWeights[alan.priority ?? 'normal']`.
+- **Forecast**: gerçekleşen süre = tamamlanan saatlik görevlerin süresi (varsa elle girilen `actualMinutes`); projeksiyon = gerçekleşen + dönemin kalanındaki planlı süre; tempo = gerçekleşen vs. bütçe × geçen süre oranı. `forecastDeviationThreshold` aşılınca uyarı.
+- **Hedef sapması**: alt işlerden toplanan ilerleme (roll-up) vs. hedefin geçen süre oranı.
+- Çıktı somut önerilere çevrilir ve Takvim sekmelerinde (dönem rehberi) ve Genel Bakış'ta (haftalık rehber) gösterilir. Öneriler şimdilik otomatik uygulanmaz, kullanıcı karar verir.
