@@ -1,0 +1,47 @@
+/**
+ * Renk token'ları — Zaman & Kaynak Yönetimi Paydaşı'nın onayladığı palet.
+ * bkz. docs/decisions/0001-teknoloji-yigini.md ve renk paleti artifact'ı.
+ * Hardcode edilmiş renk kullanımı yasak: bileşenler her zaman bu token'lara
+ * (Tailwind üzerinden `bg-primary`, `text-text` vb. sınıflarla) referans verir.
+ */
+
+:root {
+  --bg: #f8f9fa;
+  --surface: #ffffff;
+  --border: #e9ecef;
+  --text: #1a1b1e;
+  --text-secondary: #5c5f66;
+  --primary: #3b5bdb;
+  --primary-text: #ffffff;
+  --success: #2f9e44;
+  --warning: #e8590c;
+  --danger: #e03131;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #1a1b1e;
+    --surface: #25262b;
+    --border: #373a40;
+    --text: #f8f9fa;
+    --text-secondary: #a6a7ab;
+    --primary: #748ffc;
+    --primary-text: #1a1b1e;
+    --success: #69db7c;
+    --warning: #ffa94d;
+    --danger: #ff8787;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #1a1b1e;
+  --surface: #25262b;
+  --border: #373a40;
+  --text: #f8f9fa;
+  --text-secondary: #a6a7ab;
+  --primary: #748ffc;
+  --primary-text: #1a1b1e;
+  --success: #69db7c;
+  --warning: #ffa94d;
+  --danger: #ff8787;
+}

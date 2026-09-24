@@ -1,6 +1,6 @@
 # Kavram Sözlüğü
 
-> Faz 0 taslağıdır. Faz 1'de **Zaman & Kaynak Yönetimi Paydaşı** ve **Finans Paydaşı** ile netleştirilip genişletilecek. Kesinleşmemiş terimler `(taslak)` işaretlidir.
+> Faz 1 (Keşif) ile netleştirilmiştir. Kesinleşmemiş terimler (varsa) `(taslak)` işaretlidir.
 
 ## Planlama
 | Terim | Tanım |
@@ -29,15 +29,19 @@
 | SF (Start-to-Finish) | A başlamadan B bitemez |
 | Lag / Lead | Bağımlılığa eklenen gecikme / öne alma süresi |
 
-## Hayat alanları ve gereklilikler (taslak — Faz 1'de netleşecek)
-| Terim | Tanım |
-|---|---|
-| Hayat alanı | Kullanıcının ilerlemek istediği dinamik olarak tanımlı kategori (ör. mühendislik, iş, sosyal, sağlık, finans) |
-| Gereklilik | Bir hayat alanında ilerlemek için gereken, ölçülebilir ve takip edilebilir birim |
-| Gereklilik türü (taslak) | Bilgi, Beceri, İlişki/Ağ, Finansal kaynak, Varlık/Araç, Belge/Yetkinlik, Alışkanlık, Sağlık/Enerji, Deneyim — **kesin liste Paydaş personasının soracağı sorularla belirlenecek** |
+## Hayat alanları ve gereklilikler
+İki eksenli model: **hayat alanı** (dinamik, kullanıcı tanımlı) × **gereklilik türü** (sabit 9 tür). Bu iki kavram birbirinin alt kategorisi değil, birbirinden bağımsız iki sınıflandırma eksenidir — her gereklilik hem bir hayat alanına hem bir türe aittir.
 
-## Finans (taslak — Faz 1'de netleşecek)
 | Terim | Tanım |
 |---|---|
-| Kategori / alt kategori | Finans Paydaşı'nın kullanıcıya sorarak belirleyeceği, ayarlardan yönetilebilir harcama/gelir sınıflandırması |
+| Hayat alanı | Kullanıcının ilerlemek istediği dinamik olarak tanımlı kategori (ör. mühendislik, iş, sosyal, sağlık, finans); ekle/sil/düzenle serbest |
+| Gereklilik | Bir hayat alanında ilerlemek için gereken, ölçülebilir ve takip edilebilir birim |
+| Gereklilik türü | Sabit liste: Bilgi, Beceri, İlişki/Ağ, Finansal kaynak, Varlık/Araç, Belge/Yetkinlik, Alışkanlık, Sağlık/Enerji, Deneyim |
+
+## Finans
+| Terim | Tanım |
+|---|---|
+| Kategori / alt kategori | Ayarlardan yönetilebilir harcama/gelir sınıflandırması — başlangıç seti `requirements.md` §7'de |
+| İhtiyaç / İstek | Kategoriye ek, çapraz filtre etiketi (ayrı kategori değil) |
 | Bütçe vs. gerçekleşen | Planlanan harcama ile gerçekleşen harcamanın karşılaştırılması |
+| Referans kur snapshot'ı | İşlem girildiği andaki USD, gram altın ve BTC fiyatının işlemle birlikte kaydedilmesi — harcamanın zaman içinde bu birimler cinsinden değerini görebilmek için |
