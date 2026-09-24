@@ -20,6 +20,21 @@
 | Detaylandırma penceresi | Bir ölçekte kaç gün/hafta/ay ileriye kadar detaylı (alt ölçeğe kırılmış) plan yapıldığı — ayarlardan değiştirilebilir |
 | Review ritmi | Günlük/haftalık/aylık/yıllık gözden geçirme döngüsü |
 
+## İş hiyerarşisi ve iş akışı
+Jira eşlemesi (bkz. `.claude/personas/jira-developer.md`). Her iş bir üst ölçekteki işe **parent link** ile bağlanır ve hayat alanını ondan devralır; aynı iş tek kaynaktır, her ölçek görünümünde (dönemle kesiştiği sürece) görünür.
+
+| Terim | Tanım |
+|---|---|
+| Initiative | Hayat alanı — hiyerarşinin kökü |
+| Epic | 3 Yıl / Yıl ölçeğindeki hedef |
+| Story | Ay ölçeğindeki iş |
+| Task | Hafta / Gün / Saat ölçeğindeki iş |
+| Parent link (üst iş) | Bir işin bağlı olduğu bir üst ölçekteki iş; ebeveyni olmayan (kök) işte hayat alanı zorunludur |
+| Roll-up | Üst işin ilerlemesinin alt işlerden hesaplanması (tamamlanan alt işlerin ağırlıksız ortalaması) |
+| İş akışı durumu | Planlandı → Devam ediyor → Tamamlandı; Pano'nun kolonlarıdır |
+| Gecikti | Durum değil, işarettir: bitiş tarihi geçmiş ve tamamlanmamış işlerde otomatik gösterilir |
+| Pano (Kanban) | İşlerin durum kolonlarında sürükle-bırak / klavye ile taşındığı görünüm |
+
 ## Görev bağımlılıkları
 | Terim | Tanım |
 |---|---|

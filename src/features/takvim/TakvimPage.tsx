@@ -37,7 +37,11 @@ const HEADER_FORMAT: Record<'day' | 'week' | 'month', string> = {
   month: 'MMMM yyyy',
 }
 
-function horizonSubtitle(view: 'year' | 'year3', referenceDate: Date, weekStartsOn: number): string {
+function horizonSubtitle(
+  view: 'year' | 'year3',
+  referenceDate: Date,
+  weekStartsOn: number,
+): string {
   const period = scalePeriodRange(view, referenceDate, weekStartsOn)
   if (view === 'year') return format(period.start, 'yyyy')
   const lastYear = addYears(period.start, YEAR3_SPAN_YEARS - LAST_YEAR_OFFSET)
@@ -105,6 +109,9 @@ export function TakvimPage() {
 
       {view === 'day' && <DayAgenda date={referenceDate} />}
       {view === 'week' && (
+        <HorizonBoard scale="week" referenceDate={referenceDate} weekStartsOn={weekStartsOn} />
+      )}
+      {view === 'week' && (
         <WeekView
           referenceDate={referenceDate}
           weekStartsOn={weekStartsOn}
@@ -113,6 +120,9 @@ export function TakvimPage() {
             setView('day')
           }}
         />
+      )}
+      {view === 'month' && (
+        <HorizonBoard scale="month" referenceDate={referenceDate} weekStartsOn={weekStartsOn} />
       )}
       {view === 'month' && (
         <MonthView

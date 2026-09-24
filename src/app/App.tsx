@@ -3,6 +3,7 @@ import { signOut } from 'firebase/auth'
 import {
   CalendarDays,
   Clock,
+  KanbanSquare,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -18,6 +19,7 @@ import { UidProvider } from './UidContext'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { BugunPage } from '../features/bugun/BugunPage'
 import { TakvimPage } from '../features/takvim/TakvimPage'
+import { KanbanPage } from '../features/is-takibi/KanbanPage'
 import { HayatAlanlariPage } from '../features/hayat-alanlari/HayatAlanlariPage'
 import { FinansPage } from '../features/finans/FinansPage'
 import { AyarlarPage } from '../features/ayarlar/AyarlarPage'
@@ -26,6 +28,7 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: LucideIcon }[
   { to: '/', label: 'Genel Bakış', end: true, icon: LayoutDashboard },
   { to: '/bugun', label: 'Bugün', icon: Clock },
   { to: '/takvim', label: 'Takvim', icon: CalendarDays },
+  { to: '/pano', label: 'Pano', icon: KanbanSquare },
   { to: '/hayat-alanlari', label: 'Hayat Alanları', icon: Target },
   { to: '/finans', label: 'Finans', icon: Wallet },
   { to: '/ayarlar', label: 'Ayarlar', icon: Settings },
@@ -83,6 +86,7 @@ export function App({ uid }: { uid: string }) {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/bugun" element={<BugunPage />} />
             <Route path="/takvim" element={<TakvimPage />} />
+            <Route path="/pano" element={<KanbanPage />} />
             <Route path="/hayat-alanlari" element={<HayatAlanlariPage />} />
             <Route path="/finans" element={<FinansPage />} />
             <Route path="/ayarlar" element={<AyarlarPage />} />

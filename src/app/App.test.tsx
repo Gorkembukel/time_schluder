@@ -50,6 +50,10 @@ vi.mock('../services/repositories/tasksRepository', () => ({
     onChange([])
     return () => {}
   },
+  subscribeAllTasks: (_uid: string, onChange: (tasks: unknown[]) => void) => {
+    onChange([])
+    return () => {}
+  },
   fetchAllTasks: vi.fn().mockResolvedValue([]),
   createTask: vi.fn(),
   updateTaskStatus: vi.fn(),
@@ -95,6 +99,7 @@ describe('App', () => {
   it('ana navigasyon linklerini gösterir', () => {
     renderApp()
     expect(screen.getByRole('link', { name: 'Takvim' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Pano' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Finans' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Ayarlar' })).toBeInTheDocument()
   })

@@ -1,5 +1,7 @@
 import { Target } from 'lucide-react'
 import { useRequirements } from '../../hooks/useRequirements'
+import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
+import { effectiveLifeAreaId, rollupProgress } from '../../lib/taskHierarchy'
 import { Card } from '../../components/Card'
 import { EmptyState } from '../../components/EmptyState'
 import { Badge } from '../../components/Badge'
@@ -12,7 +14,9 @@ function areaProgress(requirements: { targetMetric: number; currentValue: number
   if (withTarget.length === 0) return 0
   const average =
     withTarget.reduce(
-      (sum, r) => sum + Math.min(PROGRESS_MAX_PERCENT, (r.currentValue / r.targetMetric) * PROGRESS_MAX_PERCENT),
+      (sum, r) =>
+        sum +
+        Math.min(PROGRESS_MAX_PERCENT, (r.currentValue / r.targetMetric) * PROGRESS_MAX_PERCENT),
       0,
     ) / withTarget.length
   return Math.round(average)
@@ -20,7 +24,18 @@ function areaProgress(requirements: { targetMetric: number; currentValue: number
 
 function AreaProgressRow({ uid, area }: { uid: string; area: LifeArea }) {
   const { requirements } = useRequirements(uid, area.id)
+  const { tasks, index, children } = useTaskHierarchy()
   const progress = areaProgress(requirements)
+  const rootGoals = tasks.filter(
+    (t) => !t.parentTaskId && effectiveLifeAreaId(t, index) === area.id,
+  )
+  const goalProgress =
+    rootGoals.length === 0
+      ? null
+      : Math.round(
+          (rootGoals.reduce((sum, g) => sum + rollupProgress(g, children), 0) / rootGoals.length) *
+            PROGRESS_MAX_PERCENT,
+        )
 
   return (
     <div>
@@ -28,6 +43,8 @@ function AreaProgressRow({ uid, area }: { uid: string; area: LifeArea }) {
         <span className="text-text">{area.name}</span>
         <div className="flex items-center gap-2 text-text-secondary">
           <Badge variant="neutral">{requirements.length} gereklilik</Badge>
+          <Badge variant="neutral">{rootGoals.length} hedef</Badge>
+          {goalProgress !== null && <span>Hedef %{goalProgress}</span>}
           <span>%{progress}</span>
         </div>
       </div>

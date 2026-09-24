@@ -7,6 +7,9 @@ import {
   updateRequirementProgress,
 } from '../../services/repositories/requirementsRepository'
 import { useRequirements } from '../../hooks/useRequirements'
+import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
+import { effectiveRequirementId } from '../../lib/taskHierarchy'
+import { AreaGoals } from './AreaGoals'
 import {
   REQUIREMENT_TYPES,
   REQUIREMENT_TYPE_LABELS,
@@ -88,7 +91,12 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
         )}
       </div>
 
-      <div className="mt-4 flex flex-col gap-2">
+      <AreaGoals areaId={area.id} />
+
+      <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        Gereklilikler
+      </h3>
+      <div className="mt-2 flex flex-col gap-2">
         {loading ? (
           <SkeletonLines count={LOADING_ROW_COUNT} className="h-10" />
         ) : requirements.length === 0 ? (
@@ -106,7 +114,11 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
       </div>
 
       {showNewRequirement ? (
-        <NewRequirementForm uid={uid} areaId={area.id} onDone={() => setShowNewRequirement(false)} />
+        <NewRequirementForm
+          uid={uid}
+          areaId={area.id}
+          onDone={() => setShowNewRequirement(false)}
+        />
       ) : (
         <Button
           variant="ghost"
@@ -132,6 +144,9 @@ function RequirementRow({
   requirement: Requirement
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const { tasks, index } = useTaskHierarchy()
+  const linkedTasks = tasks.filter((t) => effectiveRequirementId(t, index) === requirement.id)
+  const linkedDone = linkedTasks.filter((t) => t.status === 'done').length
   const progress =
     requirement.targetMetric > 0
       ? Math.min(
@@ -145,7 +160,14 @@ function RequirementRow({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-sm text-text">{requirement.name}</p>
-          <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[requirement.type]}</Badge>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[requirement.type]}</Badge>
+            {linkedTasks.length > 0 && (
+              <Badge variant="primary">
+                {linkedDone}/{linkedTasks.length} bağlı iş tamamlandı
+              </Badge>
+            )}
+          </div>
         </div>
         {confirmingDelete ? (
           <div className="flex items-center gap-1 text-xs">

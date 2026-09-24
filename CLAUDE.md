@@ -6,17 +6,16 @@ Asıl kaynağın **zaman** olduğu kişisel kaynak yönetimi web uygulaması. 3 
 Detaylı ürün tanımı: [`docs/requirements.md`](docs/requirements.md). Kavramlar: [`docs/domain-glossary.md`](docs/domain-glossary.md). Mimari kararlar: [`docs/decisions/`](docs/decisions/).
 
 ## Durum
-Proje **Faz 2** (mimari) aşamasında; Faz 0 (altyapı) ve Faz 1 (keşif) tamamlandı. Mimari kararlar `docs/decisions/0001`–`0006` içinde ADR olarak önerildi (durum: onay bekliyor). Kod iskeleti henüz kurulmadı — bu Faz 3'te yapılacak.
+Uygulama canlıda (GitHub Pages: https://gorkembukel.github.io/time_schluder/). İlk kurulumdaki faz tanımları artık takip edilmiyor; geliştirme mevcut kod üzerinde iteratif olarak ilerliyor. Mimari kararlar: `docs/decisions/0001`–`0006`.
 
-**Seçilen/önerilen yığın** (bkz. ADR 0001): Vite + React + TypeScript, Zustand, React Router (`HashRouter`), Tailwind CSS + CSS custom property tema token'ları, date-fns, Vitest + React Testing Library + Playwright. Yayın: GitHub Pages + GitHub Actions (`actions/deploy-pages`). Backend: Firebase Spark (ücretsiz) — Firestore + Auth, Cloud Functions **yok** (tüm hesaplama istemci tarafında).
+**Yığın** (bkz. ADR 0001): Vite + React + TypeScript, Zustand, React Router (`HashRouter`), Tailwind CSS + CSS custom property tema token'ları, date-fns, Vitest + React Testing Library + Playwright. Yayın: GitHub Pages + GitHub Actions (`actions/deploy-pages`, `main`'e push ile). Backend: Firebase Spark (ücretsiz) — Firestore + Auth, Cloud Functions **yok** (tüm hesaplama istemci tarafında). Deploy build'i Firebase config'ini `VITE_FIREBASE_*` repo secret'larından alır.
 
 ## Komutlar
-> Faz 3'te proje iskeleti kurulunca gerçek script'lerle güncellenecek. Planlanan (ADR 0001, 0005):
-> - `npm run dev` — yerel geliştirme sunucusu
-> - `npm run build` — üretim derlemesi (GitHub Pages `base: /time_schluder/`)
-> - `npm run lint` — ESLint
-> - `npm run test` — Vitest (unit/component)
-> - `npm run test:e2e` — Playwright
+- `npm run dev` — yerel geliştirme sunucusu
+- `npm run build` — üretim derlemesi (`base: /time_schluder/`)
+- `npm run lint` — ESLint
+- `npm run test` — Vitest (unit/component; Firebase `src/test/setup.ts`'te mock'lanır, `.env` gerekmez)
+- `npm run test:e2e` — Playwright
 
 ## Git akışı
 - Her değişiklikten önce `git-checkpoint` skill'i ile mevcut durum korunur (commit + push), sonra yeni branch açılır.

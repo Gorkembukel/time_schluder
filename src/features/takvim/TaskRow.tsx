@@ -5,12 +5,14 @@ import {
   deleteTask,
   fetchAllTasks,
   stripDependencyReferences,
-  updateTaskStatus,
 } from '../../services/repositories/tasksRepository'
-import { useLifeAreasStore } from '../../stores/lifeAreasStore'
+import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { recalculateFromDeletion } from '../../lib/planning-engine'
-import { TASK_STATUSES, TASK_STATUS_LABELS, type Task, type TaskStatus } from '../../types/domain'
+import type { Task } from '../../types/domain'
+import { StatusControl } from '../is-takibi/StatusControl'
+import { OverdueBadge } from '../is-takibi/OverdueBadge'
+import { TaskBreadcrumb } from '../is-takibi/TaskBreadcrumb'
 import { TaskEditor } from './TaskEditor'
 import { Button } from '../../components/Button'
 
@@ -21,7 +23,7 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [deleteNote, setDeleteNote] = useState<string | null>(null)
-  const areaName = useLifeAreasStore((s) => s.areas.find((a) => a.id === task.lifeAreaId)?.name)
+  const { index } = useTaskHierarchy()
   const majorChangeThreshold = useSettingsStore(
     (s) => s.settings.planningEngine.majorChangeThreshold,
   )
@@ -55,14 +57,18 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
         <p
           className={`flex items-center gap-1.5 ${task.status === 'done' ? 'text-text-secondary line-through' : 'text-text'}`}
         >
-          {task.status === 'done' && <CheckCircle2 size={ICON_SIZE} className="shrink-0 text-success" />}
+          {task.status === 'done' && (
+            <CheckCircle2 size={ICON_SIZE} className="shrink-0 text-success" />
+          )}
           <span className="text-xs font-medium text-text-secondary">
-            {format(new Date(task.startAt), TIME_FORMAT)}–{format(new Date(task.endAt), TIME_FORMAT)}
+            {format(new Date(task.startAt), TIME_FORMAT)}–
+            {format(new Date(task.endAt), TIME_FORMAT)}
           </span>
           {task.title}
         </p>
         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-          {areaName && <span>{areaName}</span>}
+          <TaskBreadcrumb task={task} index={index} />
+          <OverdueBadge task={task} />
           {task.dependencies.length > 0 && (
             <span className="flex items-center gap-1">
               <Link2 size={12} />
@@ -73,17 +79,7 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
         {deleteNote && <p className="text-xs text-warning">{deleteNote}</p>}
       </div>
       <div className="flex items-center gap-2">
-        <select
-          value={task.status}
-          onChange={(e) => void updateTaskStatus(uid, task.id, e.target.value as TaskStatus)}
-          className="rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text"
-        >
-          {TASK_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {TASK_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
+        <StatusControl uid={uid} task={task} />
         <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
           <Pencil size={ICON_SIZE} />
           Düzenle
