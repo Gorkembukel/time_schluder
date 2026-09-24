@@ -1,21 +1,14 @@
 import type { ChangeEvent, ReactNode } from 'react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
 import { updateCategoryBudget } from '../../services/repositories/financeCategoriesRepository'
 import { useUid } from '../../app/UidContext'
 import { Skeleton } from '../../components/Skeleton'
-import { PLANNING_SCALES, type PlanningScale, type Theme } from '../../types/domain'
+import { PageHeader } from '../../components/PageHeader'
+import { PLANNING_SCALES, PLANNING_SCALE_LABELS, type Theme } from '../../types/domain'
 
 const LOADING_SECTION_COUNT = 3
-
-const SCALE_LABELS: Record<PlanningScale, string> = {
-  year3: '3 Yıl',
-  year: 'Yıl',
-  month: 'Ay',
-  week: 'Hafta',
-  day: 'Gün',
-  hour: 'Saat',
-}
 
 const WEEKDAY_LABELS = [
   { value: 1, label: 'Pazartesi' },
@@ -33,10 +26,11 @@ const DETAIL_WINDOW_MIN = 0
 const BUFFER_RATIO_MIN = 0
 const BUFFER_RATIO_MAX = 1
 const BUFFER_RATIO_STEP = 0.05
+const UPCOMING_WINDOW_MIN = 1
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-text">{title}</h2>
       <div className="mt-4 flex flex-col gap-3">{children}</div>
     </section>
@@ -82,8 +76,8 @@ export function AyarlarPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Ayarlar</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader icon={SettingsIcon} title="Ayarlar" />
 
       <Section title="Genel">
         <Field label="Dil">
@@ -101,6 +95,22 @@ export function AyarlarPage() {
             <option value="USD">USD ($)</option>
             <option value="EUR">EUR (€)</option>
           </select>
+        </Field>
+      </Section>
+
+      <Section title="Genel Bakış">
+        <Field label="Yaklaşan görevler penceresi (gün)">
+          <input
+            type="number"
+            min={UPCOMING_WINDOW_MIN}
+            className={inputClass}
+            value={settings.dashboard.upcomingWindowDays}
+            onChange={(e) =>
+              void update({
+                dashboard: { upcomingWindowDays: Number(e.target.value) },
+              })
+            }
+          />
         </Field>
       </Section>
 
@@ -142,7 +152,7 @@ export function AyarlarPage() {
 
       <Section title="Planlama Motoru">
         {PLANNING_SCALES.map((scale) => (
-          <Field key={scale} label={`Detaylandırma penceresi — ${SCALE_LABELS[scale]} (gün)`}>
+          <Field key={scale} label={`Detaylandırma penceresi — ${PLANNING_SCALE_LABELS[scale]} (gün)`}>
             <input
               type="number"
               min={DETAIL_WINDOW_MIN}

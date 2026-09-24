@@ -10,7 +10,7 @@ function settingsDocRef(uid: string) {
 export function subscribeSettings(uid: string, onChange: (settings: Settings) => void): Unsubscribe {
   return onSnapshot(settingsDocRef(uid), (snapshot) => {
     if (snapshot.exists()) {
-      onChange(snapshot.data() as Settings)
+      onChange({ ...DEFAULT_SETTINGS, ...(snapshot.data() as Partial<Settings>) })
     } else {
       void setDoc(settingsDocRef(uid), DEFAULT_SETTINGS)
       onChange(DEFAULT_SETTINGS)

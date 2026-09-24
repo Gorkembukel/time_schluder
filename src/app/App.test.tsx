@@ -15,6 +15,7 @@ vi.mock('../services/repositories/settingsRepository', () => ({
       },
       appearance: { theme: 'system' },
       reviewRhythms: { daily: true, weekly: true, monthly: true, yearly: true },
+      dashboard: { upcomingWindowDays: 7 },
     })
     return () => {}
   },
@@ -37,6 +38,44 @@ vi.mock('../services/repositories/lifeAreasRepository', () => ({
   createLifeArea: vi.fn(),
   renameLifeArea: vi.fn(),
   deleteLifeArea: vi.fn(),
+}))
+
+vi.mock('../services/repositories/tasksRepository', () => ({
+  subscribeTasksInRange: (
+    _uid: string,
+    _start: string,
+    _end: string,
+    onChange: (tasks: unknown[]) => void,
+  ) => {
+    onChange([])
+    return () => {}
+  },
+  fetchAllTasks: vi.fn().mockResolvedValue([]),
+  createTask: vi.fn(),
+  updateTaskStatus: vi.fn(),
+  updateTaskDependencies: vi.fn(),
+  applyTaskChanges: vi.fn(),
+  deleteTask: vi.fn(),
+  stripDependencyReferences: vi.fn(),
+}))
+
+vi.mock('../services/repositories/financeTransactionsRepository', () => ({
+  subscribeTransactions: (_uid: string, onChange: (transactions: unknown[]) => void) => {
+    onChange([])
+    return () => {}
+  },
+  createTransaction: vi.fn(),
+  deleteTransaction: vi.fn(),
+}))
+
+vi.mock('../services/repositories/requirementsRepository', () => ({
+  subscribeRequirements: (_uid: string, _areaId: string, onChange: (reqs: unknown[]) => void) => {
+    onChange([])
+    return () => {}
+  },
+  createRequirement: vi.fn(),
+  updateRequirementProgress: vi.fn(),
+  deleteRequirement: vi.fn(),
 }))
 
 function renderApp() {

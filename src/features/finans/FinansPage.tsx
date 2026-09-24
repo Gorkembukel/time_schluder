@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus, Wallet, X } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
@@ -6,30 +7,21 @@ import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { deleteTransaction } from '../../services/repositories/financeTransactionsRepository'
 import { formatTRY } from '../../lib/format'
 import { TransactionForm } from './TransactionForm'
-import { MagnitudeBreakdown, type BreakdownItem } from './MagnitudeBreakdown'
+import { MagnitudeBreakdown } from './MagnitudeBreakdown'
 import { BudgetComparison } from './BudgetComparison'
 import { SkeletonLines } from '../../components/Skeleton'
+import { PageHeader } from '../../components/PageHeader'
+import { Card } from '../../components/Card'
+import { Button } from '../../components/Button'
+import { buildBreakdown } from '../../lib/financeBreakdown'
 import type { FinanceTransaction } from '../../types/domain'
 
 const ISO_MONTH_LENGTH = 7
 const RECENT_TRANSACTIONS_SKELETON_COUNT = 3
+const ICON_SIZE = 16
 
 function currentMonthPrefix(): string {
   return new Date().toISOString().slice(0, ISO_MONTH_LENGTH)
-}
-
-function buildBreakdown(
-  transactions: FinanceTransaction[],
-  keyOf: (tx: FinanceTransaction) => string | undefined,
-  labelOf: (id: string) => string,
-): BreakdownItem[] {
-  const totals = new Map<string, number>()
-  for (const tx of transactions) {
-    const key = keyOf(tx)
-    if (!key) continue
-    totals.set(key, (totals.get(key) ?? 0) + tx.amountTRY)
-  }
-  return [...totals.entries()].map(([id, amount]) => ({ id, label: labelOf(id), amount }))
 }
 
 export function FinansPage() {
@@ -38,6 +30,7 @@ export function FinansPage() {
   const categories = useFinanceCategoriesStore((s) => s.categories)
   const areas = useLifeAreasStore((s) => s.areas)
   const [formKey, setFormKey] = useState(0)
+  const [showForm, setShowForm] = useState(false)
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? id
   const areaName = (id: string) => areas.find((a) => a.id === id)?.name ?? id
@@ -51,10 +44,33 @@ export function FinansPage() {
   const areaBreakdown = buildBreakdown(monthExpenses, (tx) => tx.lifeAreaId, areaName)
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Finans</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        icon={Wallet}
+        title="Finans"
+        actions={
+          <Button variant="primary" size="sm" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? <X size={ICON_SIZE} /> : <Plus size={ICON_SIZE} />}
+            {showForm ? 'Vazgeç' : 'İşlem ekle'}
+          </Button>
+        }
+      />
 
-      <TransactionForm key={formKey} onCreated={() => setFormKey((k) => k + 1)} />
+      <div
+        className={`grid transition-all motion-safe:duration-300 ${
+          showForm ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <TransactionForm
+            key={formKey}
+            onCreated={() => {
+              setFormKey((k) => k + 1)
+              setShowForm(false)
+            }}
+          />
+        </div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <MagnitudeBreakdown
@@ -71,7 +87,7 @@ export function FinansPage() {
 
       <BudgetComparison categories={categories} monthExpenses={monthExpenses} />
 
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <Card className="p-5">
         <h2 className="text-sm font-semibold text-text">Son işlemler</h2>
         {loading ? (
           <SkeletonLines count={RECENT_TRANSACTIONS_SKELETON_COUNT} className="mt-3" />
@@ -84,7 +100,7 @@ export function FinansPage() {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
@@ -116,30 +132,18 @@ function TransactionRow({
           {formatTRY(tx.amountTRY)}
         </span>
         {confirmingDelete ? (
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => void deleteTransaction(uid, tx.id)}
-              className="font-medium text-danger"
-            >
+          <div className="flex items-center gap-1 text-xs">
+            <Button variant="danger" size="sm" onClick={() => void deleteTransaction(uid, tx.id)}>
               Sil
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="text-text-secondary"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
               Vazgeç
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="text-xs text-text-secondary hover:text-danger"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
             Sil
-          </button>
+          </Button>
         )}
       </div>
     </li>

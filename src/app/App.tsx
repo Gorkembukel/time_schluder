@@ -1,23 +1,37 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
+import {
+  CalendarDays,
+  Clock,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  Target,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { auth } from '../services/firebase'
 import { useUserDataSync } from '../hooks/useUserDataSync'
 import { useApplyTheme } from '../hooks/useApplyTheme'
 import { useSettingsStore } from '../stores/settingsStore'
 import { UidProvider } from './UidContext'
+import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { BugunPage } from '../features/bugun/BugunPage'
 import { TakvimPage } from '../features/takvim/TakvimPage'
 import { HayatAlanlariPage } from '../features/hayat-alanlari/HayatAlanlariPage'
 import { FinansPage } from '../features/finans/FinansPage'
 import { AyarlarPage } from '../features/ayarlar/AyarlarPage'
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Bugün', end: true },
-  { to: '/takvim', label: 'Takvim' },
-  { to: '/hayat-alanlari', label: 'Hayat Alanları' },
-  { to: '/finans', label: 'Finans' },
-  { to: '/ayarlar', label: 'Ayarlar' },
+const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
+  { to: '/', label: 'Genel Bakış', end: true, icon: LayoutDashboard },
+  { to: '/bugun', label: 'Bugün', icon: Clock },
+  { to: '/takvim', label: 'Takvim', icon: CalendarDays },
+  { to: '/hayat-alanlari', label: 'Hayat Alanları', icon: Target },
+  { to: '/finans', label: 'Finans', icon: Wallet },
+  { to: '/ayarlar', label: 'Ayarlar', icon: Settings },
 ]
+
+const NAV_ICON_SIZE = 16
 
 export function App({ uid }: { uid: string }) {
   useUserDataSync(uid)
@@ -28,39 +42,46 @@ export function App({ uid }: { uid: string }) {
     <UidProvider uid={uid}>
       <div className="min-h-screen bg-bg text-text">
         <nav className="border-b border-border bg-surface">
-          <ul className="mx-auto flex max-w-3xl items-center gap-1 px-4 py-2">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  viewTransition
-                  className={({ isActive }) =>
-                    `rounded-full px-3 py-1.5 text-sm font-medium transition-all motion-safe:duration-150 ${
-                      isActive
-                        ? 'bg-primary text-primary-text'
-                        : 'text-text-secondary hover:bg-border/60 hover:text-text'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-            <li className="ml-auto">
-              <button
-                type="button"
-                onClick={() => void signOut(auth)}
-                className="text-sm text-text-secondary transition-colors hover:text-text"
-              >
-                Çıkış yap
-              </button>
-            </li>
-          </ul>
+          <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-2.5">
+            <div className="flex items-center gap-1.5 pr-2 text-text">
+              <Clock size={18} className="text-primary" />
+              <span className="text-sm font-bold tracking-tight">Zaman Schluder</span>
+            </div>
+            <ul className="flex flex-1 flex-wrap items-center gap-1">
+              {NAV_ITEMS.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    viewTransition
+                    className={({ isActive }) =>
+                      `flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-all motion-safe:duration-150 ${
+                        isActive
+                          ? 'bg-primary text-primary-text'
+                          : 'text-text-secondary hover:bg-border/60 hover:text-text'
+                      }`
+                    }
+                  >
+                    <item.icon size={NAV_ICON_SIZE} />
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => void signOut(auth)}
+              className="flex items-center gap-1.5 text-sm text-text-secondary transition-colors hover:text-text"
+            >
+              <LogOut size={NAV_ICON_SIZE} />
+              Çıkış yap
+            </button>
+          </div>
         </nav>
-        <main className="mx-auto max-w-3xl px-4 py-8">
+        <main className="mx-auto max-w-5xl px-4 py-8">
           <Routes>
-            <Route path="/" element={<BugunPage />} />
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/bugun" element={<BugunPage />} />
             <Route path="/takvim" element={<TakvimPage />} />
             <Route path="/hayat-alanlari" element={<HayatAlanlariPage />} />
             <Route path="/finans" element={<FinansPage />} />

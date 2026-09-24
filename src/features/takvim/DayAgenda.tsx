@@ -1,10 +1,13 @@
 import { useState } from 'react'
+import { ListTodo } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useTasksInRange } from '../../hooks/useTasksInRange'
 import { dayRange } from '../../lib/dateRange'
 import { TaskForm } from './TaskForm'
 import { TaskRow } from './TaskRow'
 import { SkeletonLines } from '../../components/Skeleton'
+import { Card } from '../../components/Card'
+import { EmptyState } from '../../components/EmptyState'
 
 const LOADING_ROW_COUNT = 3
 
@@ -20,11 +23,15 @@ export function DayAgenda({ date }: { date: Date }) {
   return (
     <div className="flex flex-col gap-4">
       <TaskForm key={formKey} defaultDate={date} onCreated={() => setFormKey((k) => k + 1)} />
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <Card className="p-5">
         {loading ? (
           <SkeletonLines count={LOADING_ROW_COUNT} />
         ) : sorted.length === 0 ? (
-          <p className="text-sm text-text-secondary">Bu gün için görev yok.</p>
+          <EmptyState
+            icon={ListTodo}
+            title="Bu gün için görev yok"
+            description="Yukarıdaki formla hızlıca bir görev ekleyebilirsin."
+          />
         ) : (
           <ul className="flex flex-col divide-y divide-border">
             {sorted.map((task) => (
@@ -32,7 +39,7 @@ export function DayAgenda({ date }: { date: Date }) {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

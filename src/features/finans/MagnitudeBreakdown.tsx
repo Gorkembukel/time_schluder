@@ -1,12 +1,10 @@
 import { formatTRY } from '../../lib/format'
+import { Card } from '../../components/Card'
+import type { BreakdownItem } from '../../lib/financeBreakdown'
 
 const PERCENT_MAX = 100
 
-export interface BreakdownItem {
-  id: string
-  label: string
-  amount: number
-}
+export type { BreakdownItem }
 
 /**
  * Kategoriler arası büyüklük karşılaştırması — kimlik (hue) değil miktar sırası
@@ -27,7 +25,7 @@ export function MagnitudeBreakdown({
   const maxAmount = sorted[0]?.amount ?? 0
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <Card className="p-5">
       <h2 className="text-sm font-semibold text-text">{title}</h2>
       {sorted.length === 0 ? (
         <p className="mt-3 text-sm text-text-secondary">{emptyText}</p>
@@ -57,6 +55,6 @@ export function MagnitudeBreakdown({
           })}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

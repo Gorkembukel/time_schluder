@@ -6,6 +6,7 @@ export {
   scalePeriodRange,
   finerScale,
   coarserScale,
+  YEAR3_SPAN_YEARS,
 } from './scales'
 export { buildGraph, detectCycle, topologicalSort } from './dependencyGraph'
 export { computeCriticalPath } from './criticalPath'

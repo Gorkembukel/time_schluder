@@ -1,9 +1,13 @@
 import { useState, type FormEvent } from 'react'
+import { Plus, Target } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { createLifeArea } from '../../services/repositories/lifeAreasRepository'
 import { AreaCard } from './AreaCard'
 import { Skeleton } from '../../components/Skeleton'
+import { PageHeader } from '../../components/PageHeader'
+import { Button } from '../../components/Button'
+import { EmptyState } from '../../components/EmptyState'
 
 const LOADING_CARD_COUNT = 2
 
@@ -22,22 +26,27 @@ export function HayatAlanlariPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Hayat Alanları</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        icon={Target}
+        title="Hayat Alanları"
+        subtitle="İlerlemek istediğin alanlar ve gereklilikleri"
+      />
 
-      <form onSubmit={(e) => void handleAddArea(e)} className="flex gap-2">
+      <form
+        onSubmit={(e) => void handleAddArea(e)}
+        className="flex gap-2 rounded-xl border border-border bg-surface p-3 shadow-sm"
+      >
         <input
           value={newAreaName}
           onChange={(e) => setNewAreaName(e.target.value)}
           placeholder="Yeni hayat alanı (ör. Sağlık)"
-          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"
+          className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text"
         />
-        <button
-          type="submit"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-text"
-        >
+        <Button type="submit" variant="primary">
+          <Plus size={16} />
           Ekle
-        </button>
+        </Button>
       </form>
 
       {loading ? (
@@ -47,9 +56,11 @@ export function HayatAlanlariPage() {
           ))}
         </div>
       ) : areas.length === 0 ? (
-        <p className="text-text-secondary">
-          Henüz hayat alanı yok. İlerlemek istediğin bir alan ekleyerek başla.
-        </p>
+        <EmptyState
+          icon={Target}
+          title="Henüz hayat alanı yok"
+          description="İlerlemek istediğin bir alan ekleyerek başla."
+        />
       ) : (
         <div className="flex flex-col gap-3">
           {areas.map((area) => (

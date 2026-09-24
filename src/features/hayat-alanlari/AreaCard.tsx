@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Layers, Plus, Trash2 } from 'lucide-react'
 import { deleteLifeArea, renameLifeArea } from '../../services/repositories/lifeAreasRepository'
 import {
   createRequirement,
@@ -14,10 +15,14 @@ import {
   type RequirementType,
 } from '../../types/domain'
 import { SkeletonLines } from '../../components/Skeleton'
+import { Card } from '../../components/Card'
+import { Button } from '../../components/Button'
+import { Badge } from '../../components/Badge'
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text'
 const PROGRESS_MAX_PERCENT = 100
 const LOADING_ROW_COUNT = 2
+const ICON_SIZE = 14
 
 export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   const { requirements, loading } = useRequirements(uid, area.id)
@@ -42,7 +47,7 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5 transition-shadow motion-safe:hover:shadow-md">
+    <Card interactive className="p-5">
       <div className="flex items-center justify-between gap-2">
         {editingName ? (
           <input
@@ -57,37 +62,29 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
           <button
             type="button"
             onClick={() => setEditingName(true)}
-            className="text-left text-sm font-semibold text-text"
+            className="flex items-center gap-2 text-left text-sm font-semibold text-text"
           >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Layers size={ICON_SIZE} />
+            </span>
             {area.name}
           </button>
         )}
         {confirmingDelete ? (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-1 text-xs">
             <span className="text-text-secondary">Emin misin?</span>
-            <button
-              type="button"
-              onClick={() => void deleteLifeArea(uid, area.id)}
-              className="font-medium text-danger"
-            >
+            <Button variant="danger" size="sm" onClick={() => void deleteLifeArea(uid, area.id)}>
               Sil
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="text-text-secondary"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
               Vazgeç
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="text-xs text-text-secondary hover:text-danger"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
+            <Trash2 size={ICON_SIZE} />
             Alanı sil
-          </button>
+          </Button>
         )}
       </div>
 
@@ -111,15 +108,17 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
       {showNewRequirement ? (
         <NewRequirementForm uid={uid} areaId={area.id} onDone={() => setShowNewRequirement(false)} />
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setShowNewRequirement(true)}
-          className="mt-3 text-sm text-primary"
+          className="mt-3"
         >
-          + Gereklilik ekle
-        </button>
+          <Plus size={ICON_SIZE} />
+          Gereklilik ekle
+        </Button>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -142,44 +141,37 @@ function RequirementRow({
       : 0
 
   return (
-    <div className="rounded-lg border border-border p-3">
+    <div className="rounded-lg border border-border bg-bg/50 p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-sm text-text">{requirement.name}</p>
-          <p className="text-xs text-text-secondary">
-            {REQUIREMENT_TYPE_LABELS[requirement.type]}
-          </p>
+          <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[requirement.type]}</Badge>
         </div>
         {confirmingDelete ? (
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
+          <div className="flex items-center gap-1 text-xs">
+            <Button
+              variant="danger"
+              size="sm"
               onClick={() => void deleteRequirement(uid, areaId, requirement.id)}
-              className="font-medium text-danger"
             >
               Sil
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="text-text-secondary"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
               Vazgeç
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="text-xs text-text-secondary hover:text-danger"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
             Sil
-          </button>
+          </Button>
         )}
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg">
-          <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
+          <div
+            className="h-full rounded-full bg-primary transition-all motion-safe:duration-300"
+            style={{ width: `${progress}%` }}
+          />
         </div>
         <input
           type="number"
@@ -275,12 +267,12 @@ function NewRequirementForm({
           className={`${inputClass} w-28`}
         />
       </label>
-      <button type="submit" className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-text">
+      <Button type="submit" variant="primary" size="sm">
         Ekle
-      </button>
-      <button type="button" onClick={onDone} className="text-xs text-text-secondary">
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onDone}>
         Vazgeç
-      </button>
+      </Button>
     </form>
   )
 }

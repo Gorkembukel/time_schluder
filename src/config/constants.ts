@@ -36,6 +36,10 @@ export interface Settings {
     monthly: boolean
     yearly: boolean
   }
+  dashboard: {
+    /** Genel Bakış'taki "yaklaşan görevler" listesinin kaç gün ileriyi kapsayacağı. */
+    upcomingWindowDays: number
+  }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -71,5 +75,8 @@ export const DEFAULT_SETTINGS: Settings = {
     weekly: true,
     monthly: true,
     yearly: true,
+  },
+  dashboard: {
+    upcomingWindowDays: 7,
   },
 }

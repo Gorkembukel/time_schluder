@@ -1,9 +1,13 @@
 import { useState } from 'react'
+import { AlertTriangle, ArrowLeftRight, CheckCircle2 } from 'lucide-react'
 import { swapTasks, type SwapResult } from '../../lib/planning-engine'
 import { applyTaskChanges } from '../../services/repositories/tasksRepository'
 import type { Task } from '../../types/domain'
+import { Card } from '../../components/Card'
+import { Button } from '../../components/Button'
 
 const selectClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text'
+const ICON_SIZE = 14
 
 /** requirements.md §4.6: aynı hafta içindeki iki görevi yer değiştirme. swap.ts hiçbir şeyi otomatik uygulamaz — önizleme zorunlu. */
 export function SwapPanel({ uid, tasks }: { uid: string; tasks: Task[] }) {
@@ -30,8 +34,11 @@ export function SwapPanel({ uid, tasks }: { uid: string; tasks: Task[] }) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-sm font-semibold text-text">Görev takası</p>
+    <Card className="p-4">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-text">
+        <ArrowLeftRight size={ICON_SIZE} className="text-primary" />
+        Görev takası
+      </p>
       <p className="mt-1 text-xs text-text-secondary">
         Bu haftadan iki görev seç, zamanlarını birbirleriyle değiştir.
       </p>
@@ -68,44 +75,41 @@ export function SwapPanel({ uid, tasks }: { uid: string; tasks: Task[] }) {
               </option>
             ))}
         </select>
-        <button
-          type="button"
-          onClick={handlePreview}
-          disabled={!taskIdA || !taskIdB}
-          className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary disabled:opacity-50"
-        >
+        <Button variant="secondary" size="sm" onClick={handlePreview} disabled={!taskIdA || !taskIdB}>
           Önizle
-        </button>
+        </Button>
       </div>
 
       {result && (
         <div className="mt-3">
           {result.isValid ? (
-            <p className="text-xs text-success">Çakışma yok, uygulanabilir.</p>
+            <p className="flex items-center gap-1 text-xs text-success">
+              <CheckCircle2 size={ICON_SIZE} />
+              Çakışma yok, uygulanabilir.
+            </p>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-1.5">
               {result.violations.map((v) => (
-                <li key={`${v.fromTaskId}-${v.toTaskId}-${v.type}`} className="text-xs text-warning">
+                <li
+                  key={`${v.fromTaskId}-${v.toTaskId}-${v.type}`}
+                  className="flex items-start gap-1.5 text-xs text-warning"
+                >
+                  <AlertTriangle size={ICON_SIZE} className="mt-0.5 shrink-0" />
                   {v.message}
                 </li>
               ))}
             </ul>
           )}
           <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              disabled={applying}
-              onClick={() => void handleApply()}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-text disabled:opacity-60"
-            >
+            <Button variant="primary" size="sm" disabled={applying} onClick={() => void handleApply()}>
               {result.isValid ? 'Takas et' : 'Yine de uygula'}
-            </button>
-            <button type="button" onClick={() => setResult(null)} className="text-xs text-text-secondary">
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setResult(null)}>
               Vazgeç
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
