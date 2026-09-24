@@ -85,6 +85,15 @@ vi.mock('../services/repositories/requirementsRepository', () => ({
   deleteRequirement: vi.fn(),
 }))
 
+vi.mock('../services/repositories/routinesRepository', () => ({
+  subscribeRoutines: (_uid: string, onChange: (routines: unknown[]) => void) => {
+    onChange([])
+    return () => {}
+  },
+  createRoutine: vi.fn(),
+  deleteRoutine: vi.fn(),
+}))
+
 function renderApp() {
   return render(
     <HashRouter>

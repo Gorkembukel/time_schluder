@@ -117,6 +117,21 @@ export interface Task {
   actualMinutes?: number
 }
 
+/**
+ * Her hafta tekrar eden sabit blok (ders programı, rutin). Haftalık programda dolu kabul edilir;
+ * otomatik dağıtım bu saatlere iş yerleştirmez. Saatler yerel "HH:mm".
+ */
+export interface Routine {
+  id: string
+  title: string
+  /** ISO 8601 gün numaraları: 1 = Pazartesi … 7 = Pazar */
+  weekdays: number[]
+  startTime: string
+  endTime: string
+  lifeAreaId?: string
+  createdAt: string
+}
+
 export interface FxSnapshot {
   usdRate: number | null
   goldGramPriceTRY: number | null
