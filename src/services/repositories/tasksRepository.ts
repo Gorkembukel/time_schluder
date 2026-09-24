@@ -102,7 +102,29 @@ export async function updateTaskStatus(
   taskId: string,
   status: TaskStatus,
 ): Promise<void> {
-  await updateDoc(doc(db, 'users', uid, 'tasks', taskId), { status })
+  await updateDoc(doc(db, 'users', uid, 'tasks', taskId), {
+    status,
+    completedAt: status === 'done' ? new Date().toISOString() : deleteField(),
+  })
+}
+
+/** Firestore'a gitmeden yeni bir görev belge id'si üretir (taslakların parent link'lerini önceden bağlamak için). */
+export function newTaskId(uid: string): string {
+  return doc(tasksCollectionRef(uid)).id
+}
+
+/** Firestore batch başına işlem sınırı 500; güvenli pay bırakılır. */
+const BATCH_CHUNK_SIZE = 450
+
+/** Önceden id'si belirlenmiş taslak görevleri (otomatik planlayıcı çıktısı) toplu yazar. */
+export async function createTasksBatch(uid: string, tasks: Task[]): Promise<void> {
+  for (let i = 0; i < tasks.length; i += BATCH_CHUNK_SIZE) {
+    const batch = writeBatch(db)
+    for (const { id, ...data } of tasks.slice(i, i + BATCH_CHUNK_SIZE)) {
+      batch.set(doc(db, 'users', uid, 'tasks', id), data)
+    }
+    await batch.commit()
+  }
 }
 
 export type TaskFieldsUpdate = Partial<

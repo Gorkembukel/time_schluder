@@ -3,6 +3,7 @@ import type { PlanningScale, Routine, Task } from '../types/domain'
 import {
   computeWeeklyDemands,
   constraintWindow,
+  findNextSlot,
   freeIntervals,
   planBreakdown,
   routineOccurrences,
@@ -102,6 +103,29 @@ describe('planBreakdown', () => {
       .map((m) => new Date(m.startAt).getMonth())
     expect(months).toEqual([8, 10, 11])
     expect(drafts.some((d) => d.parentTaskId === 'done')).toBe(false)
+  })
+})
+
+describe('planBreakdown rootIds', () => {
+  it('yalnızca seçilen hedefi ve onun alt zincirini kırar', () => {
+    const range = {
+      startAt: new Date(2026, 0, 1).toISOString(),
+      endAt: new Date(2027, 0, 1).toISOString(),
+    }
+    const drafts = planBreakdown({
+      tasks: [
+        task({ id: 'a', scale: 'year', ...range }),
+        task({ id: 'b', scale: 'year', ...range }),
+      ],
+      now: new Date(2026, 8, 25),
+      weekStartsOn: 1,
+      detailWindowDays: WINDOW,
+      newId: idFactory(),
+      rootIds: ['a'],
+    })
+    const ids = new Set(['a', ...drafts.map((d) => d.id)])
+    expect(drafts.length).toBeGreaterThan(0)
+    expect(drafts.every((d) => ids.has(d.parentTaskId!))).toBe(true)
   })
 })
 
@@ -265,5 +289,35 @@ describe('constraintWindow', () => {
     })
     expect(w.earliestStart).toEqual(new Date(2026, 8, 29, 10, 30))
     expect(w.blockedBy).toBeNull()
+  })
+})
+
+describe('findNextSlot', () => {
+  it('bloğu şimdiden sonraki ilk boşluğa, gerekirse sonraki haftaya taşır', () => {
+    const blockA = task({
+      id: 'a',
+      scale: 'hour',
+      startAt: new Date(2026, 8, 28, 9).toISOString(),
+      endAt: new Date(2026, 8, 28, 10).toISOString(),
+    })
+    const busyTask = task({
+      id: 'busy',
+      scale: 'hour',
+      startAt: new Date(2026, 8, 28, 10).toISOString(),
+      endAt: new Date(2026, 8, 28, 12).toISOString(),
+    })
+    const weekOf = () => week
+    const slot = findNextSlot({
+      tasks: [blockA, busyTask],
+      routines: [],
+      from: new Date(2026, 8, 28, 9, 5),
+      minutes: 60,
+      excludeId: 'a',
+      weekOf: (d) => (d < week.end ? weekOf() : { start: week.end, end: new Date(2026, 9, 12) }),
+      dayStartHour: 8,
+      dayEndHour: 18,
+    })
+    // 09:05 → 09:15'e hizalanır ama 10:00'da dolu; 45 dk yetmez → 12:00
+    expect(slot?.start).toEqual(new Date(2026, 8, 28, 12))
   })
 })

@@ -14,6 +14,7 @@ vi.mock('../services/repositories/settingsRepository', () => ({
         plannableRatio: 0.35,
         forecastDeviationThreshold: 0.25,
         priorityWeights: { low: 0.5, normal: 1, high: 2 },
+        autoBlockMinutes: 60,
         majorChangeThreshold: { affectedTaskCount: 3, criticalPathChanged: true },
       },
       appearance: { theme: 'system' },

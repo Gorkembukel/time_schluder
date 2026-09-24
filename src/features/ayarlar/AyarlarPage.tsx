@@ -34,6 +34,8 @@ const BUFFER_RATIO_MAX = 1
 const BUFFER_RATIO_STEP = 0.05
 const PRIORITY_WEIGHT_MIN = 0
 const PRIORITY_WEIGHT_STEP = 0.5
+const BLOCK_MINUTES_MIN = 15
+const BLOCK_MINUTES_STEP = 15
 const UPCOMING_WINDOW_MIN = 1
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -232,6 +234,23 @@ export function AyarlarPage() {
                 planningEngine: {
                   ...settings.planningEngine,
                   forecastDeviationThreshold: Number(e.target.value),
+                },
+              })
+            }
+          />
+        </Field>
+        <Field label="Otomatik zaman bloğu uzunluğu (dk)">
+          <input
+            type="number"
+            min={BLOCK_MINUTES_MIN}
+            step={BLOCK_MINUTES_STEP}
+            className={inputClass}
+            value={settings.planningEngine.autoBlockMinutes}
+            onChange={(e) =>
+              void update({
+                planningEngine: {
+                  ...settings.planningEngine,
+                  autoBlockMinutes: Number(e.target.value),
                 },
               })
             }

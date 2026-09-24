@@ -32,3 +32,10 @@ Varsayılan: bir yeniden hesaplamanın etkilediği görev sayısı ≥3 **veya**
 - **Forecast**: gerçekleşen süre = tamamlanan saatlik görevlerin süresi (varsa elle girilen `actualMinutes`); projeksiyon = gerçekleşen + dönemin kalanındaki planlı süre; tempo = gerçekleşen vs. bütçe × geçen süre oranı. `forecastDeviationThreshold` aşılınca uyarı.
 - **Hedef sapması**: alt işlerden toplanan ilerleme (roll-up) vs. hedefin geçen süre oranı.
 - Çıktı somut önerilere çevrilir ve Takvim sekmelerinde (dönem rehberi) ve Genel Bakış'ta (haftalık rehber) gösterilir. Öneriler şimdilik otomatik uygulanmaz, kullanıcı karar verir.
+
+## Ek: Otomatik planlayıcı ve haftalık program (2026-09-25)
+`src/lib/autoPlanner.ts` + `src/lib/autoPlan.ts`:
+1. **Kırılım** (`planBreakdown`): açık 3 Yıl/Yıl/Ay hedefleri, *hedefin kendi ölçeğinin* detaylandırma penceresi kadar ileriye alt dönemlere bölünür (ör. yıl hedefi → önümüzdeki 90 gündeki aylar). Mevcut alt işle kesişen dönem tekrar oluşturulmaz.
+2. **Talep** (`computeWeeklyDemands`): alanın haftalık backcast bütçesinden yapılan+planlı düşülür, kalan alanın yaprak hedeflerine eşit bölünür, `autoBlockMinutes`'a yuvarlanır.
+3. **Yerleşim** (`scheduleWeek`): rutinler ve mevcut bloklar dolu; talepler bağımlılık sırasına (topolojik) ve en erken bitişe göre işlenir; her turda her güne en fazla bir blok (haftaya yayılır). FS/SS başlangıç, FF/SF bitiş kısıtı; öncül hafta içinde bitmiyorsa "bloke" raporlanır.
+Sonuç önizlenir, onayla `createTasksBatch` ile önceden üretilmiş id'lerle toplu yazılır. Elle yerleşim bağımlılığı ihlal ederse engellenmez, uyarılır.

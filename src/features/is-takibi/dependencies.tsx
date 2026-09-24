@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react'
+import { useState } from 'react'
 import { Link2, X } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useTasksStore } from '../../stores/tasksStore'
@@ -10,13 +10,13 @@ import {
 } from '../../lib/dependencyLinking'
 import type { TaskIndex } from '../../lib/taskHierarchy'
 import { DEPENDENCY_TYPES, type DependencyType, type Task } from '../../types/domain'
+import { DEPENDENCY_DRAG_MIME } from './dependencyDrag'
 
 /**
  * Sürükle-bırak bağımlılık tanımlama: bir işin 🔗 tutamacını başka bir işin üzerine bırak →
  * tür seç (FS/SS/FF/SF). Bırakılan iş, sürüklenen işe bağımlı olur (sürüklenen = öncül).
  * Durum taşıma sürüklemesinden ayrı bir MIME tipi kullanılır, böylece Pano kolonları etkilenmez.
  */
-export const DEPENDENCY_DRAG_MIME = 'application/x-time-schluder-dependency'
 
 const ICON_SIZE = 12
 const CHIP_ICON_SIZE = 10
@@ -38,41 +38,6 @@ export function DependencyHandle({ task }: { task: Task }) {
       <Link2 size={ICON_SIZE} />
     </button>
   )
-}
-
-function isDependencyDrag(event: DragEvent) {
-  return event.dataTransfer.types.includes(DEPENDENCY_DRAG_MIME)
-}
-
-/** Bir kartı bağımlılık bırakma hedefi yapar. Dönen `targetProps` kart kök elemanına yayılır. */
-export function useDependencyDropTarget(task: Task) {
-  const [isOver, setIsOver] = useState(false)
-  const [pendingPredecessorId, setPendingPredecessorId] = useState<string | null>(null)
-
-  const targetProps = {
-    onDragOver: (e: DragEvent) => {
-      if (!isDependencyDrag(e)) return
-      e.preventDefault()
-      e.stopPropagation()
-      setIsOver(true)
-    },
-    onDragLeave: () => setIsOver(false),
-    onDrop: (e: DragEvent) => {
-      if (!isDependencyDrag(e)) return
-      e.preventDefault()
-      e.stopPropagation()
-      setIsOver(false)
-      const predecessorId = e.dataTransfer.getData(DEPENDENCY_DRAG_MIME)
-      if (predecessorId && predecessorId !== task.id) setPendingPredecessorId(predecessorId)
-    },
-  }
-
-  return {
-    isOver,
-    targetProps,
-    pendingPredecessorId,
-    clearPending: () => setPendingPredecessorId(null),
-  }
 }
 
 export function DependencyTypePicker({

@@ -37,6 +37,12 @@ Jira eşlemesi (bkz. `.claude/personas/jira-developer.md`). Her iş bir üst öl
 | Alan önceliği | Hayat alanının backcast bütçesindeki ağırlık çarpanı (Düşük/Normal/Yüksek); opsiyonel, varsayılan Normal |
 | Gerçekleşen süre | Tamamlanan işte harcanan süre; opsiyonel, girilmezse saatlik görevin planlanan süresi kullanılır |
 | Rehber | Dönemin kapasite/bütçe/gerçekleşme özetini ve somut önerileri gösteren panel (Takvim, Genel Bakış) |
+| Sabit program (rutin) | Her hafta tekrar eden blok (ders programı, spor, rutinler); haftalık programda dolu sayılır |
+| Haftalık program | Günler × saatler ızgarası; bloğun yüksekliği süresiyle (başlangıç → bitiş) orantılıdır |
+| Havuz | Bu haftaya düşen, altında bu haftayla kesişen açık alt hedefi olmayan (yaprak) hedefler; ızgaraya sürüklenir |
+| Alt dönemlere kır | Yukarıdan aşağı kırılım: hedefi rolling wave penceresi içindeki alt dönemlere (3 Yıl → Yıl → Ay → Hafta) böler |
+| Otomatik planla | Kırılım + backcast bütçesinden haftalık talep + boş saatlere bağımlılık/bitiş tarihine uyan yerleşim; önizlenip onaylanır |
+| Robot | Oyunlaştırılmış görev konsolu: şu anki görev, kuyruk, ertele/tamamla; XP, seviye, seri ve rozetler mevcut veriden hesaplanır |
 | Pano (Kanban) | İşlerin durum kolonlarında sürükle-bırak / klavye ile taşındığı görünüm |
 
 ## Görev bağımlılıkları

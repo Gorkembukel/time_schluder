@@ -26,7 +26,7 @@ import type { PlanningScale, Routine, Task } from '../types/domain'
 /** Hedef (goal) ölçekleri — saatlik bloklar bunların altına yerleştirilir. */
 export const GOAL_SCALES: PlanningScale[] = ['year3', 'year', 'month', 'week', 'day']
 /** Otomatik kırılımın indiği en alt ölçek; hafta içi dağıtım saatlik bloklarla yapılır. */
-const BREAKDOWN_SCALES: PlanningScale[] = ['year3', 'year', 'month']
+export const BREAKDOWN_SCALES: PlanningScale[] = ['year3', 'year', 'month']
 /** Blok başlangıçlarının hizalandığı dakika adımı (takvim ızgarasının çözünürlüğü). */
 export const SLOT_ALIGN_MINUTES = 15
 const MS_PER_MINUTE = 60_000
@@ -55,17 +55,25 @@ export function planBreakdown({
   weekStartsOn,
   detailWindowDays,
   newId,
+  rootIds,
 }: {
   tasks: Task[]
   now: Date
   weekStartsOn: number
   detailWindowDays: Record<PlanningScale, number>
   newId: () => string
+  /** Verilirse yalnızca bu hedeflerden (ve onlardan doğan alt hedeflerden) kırılım yapılır. */
+  rootIds?: string[]
 }): Task[] {
   const all = [...tasks]
   const drafts: Task[] = []
   const queue = tasks
-    .filter((t) => t.status !== 'done' && BREAKDOWN_SCALES.includes(t.scale))
+    .filter(
+      (t) =>
+        t.status !== 'done' &&
+        BREAKDOWN_SCALES.includes(t.scale) &&
+        (!rootIds || rootIds.includes(t.id)),
+    )
     .sort((a, b) => BREAKDOWN_SCALES.indexOf(a.scale) - BREAKDOWN_SCALES.indexOf(b.scale))
 
   while (queue.length > 0) {
@@ -468,4 +476,44 @@ export function scheduleWeek({
   }
 
   return { blocks: placed, unmet }
+}
+
+/**
+ * "Ertele": bir bloğu `from` anından sonraki ilk uygun boşluğa taşımak için aralık bulur
+ * (bu hafta, yoksa sonraki hafta). Rutinler ve diğer bloklar dolu sayılır.
+ */
+export function findNextSlot({
+  tasks,
+  routines,
+  from,
+  minutes,
+  excludeId,
+  weekOf,
+  dayStartHour,
+  dayEndHour,
+}: {
+  tasks: Task[]
+  routines: Routine[]
+  from: Date
+  minutes: number
+  excludeId?: string
+  weekOf: (date: Date) => DateRange
+  dayStartHour: number
+  dayEndHour: number
+}): Interval | null {
+  const thisWeek = weekOf(from)
+  for (const week of [thisWeek, weekOf(thisWeek.end)]) {
+    const busy = [
+      ...routineOccurrences(routines, week),
+      ...tasks
+        .filter(
+          (t) => t.scale === 'hour' && t.id !== excludeId && overlapsRange(t, week.start, week.end),
+        )
+        .map((t) => ({ start: new Date(t.startAt), end: new Date(t.endAt) })),
+    ]
+    const free = freeIntervals({ week, busy, now: from, dayStartHour, dayEndHour })
+    const slot = free.find((f) => addMinutes(f.start, minutes) <= f.end)
+    if (slot) return { start: slot.start, end: addMinutes(slot.start, minutes) }
+  }
+  return null
 }

@@ -115,6 +115,8 @@ export interface Task {
   detailLevel: DetailLevel
   /** Gerçekleşen süre (dk). Opsiyonel — yoksa forecast planlanan süreyi kullanır (minimum girdi ilkesi). */
   actualMinutes?: number
+  /** Tamamlandı'ya geçtiği an (oyunlaştırma: seri ve zamanında bitirme bonusu için). */
+  completedAt?: string
 }
 
 /**

@@ -16,7 +16,7 @@ import {
   updateTaskDependencies,
   updateTaskStatus,
 } from '../../services/repositories/tasksRepository'
-import { DEPENDENCY_DRAG_MIME } from './dependencies'
+import { DEPENDENCY_DRAG_MIME } from './dependencyDrag'
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {

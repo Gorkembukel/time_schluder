@@ -29,12 +29,8 @@ import {
 import { OverdueBadge } from './OverdueBadge'
 import { TaskBreadcrumb } from './TaskBreadcrumb'
 import { ProgressBar } from './ProgressBar'
-import {
-  DependencyChips,
-  DependencyHandle,
-  DependencyTypePicker,
-  useDependencyDropTarget,
-} from './dependencies'
+import { DependencyChips, DependencyHandle, DependencyTypePicker } from './dependencies'
+import { useDependencyDropTarget } from './dependencyDrag'
 
 const ICON_SIZE = 14
 const DATE_FORMAT = 'd MMM'
