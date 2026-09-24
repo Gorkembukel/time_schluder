@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Wallet } from 'lucide-react'
+import { Plus, Wallet, X } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
@@ -18,6 +18,7 @@ import type { FinanceTransaction } from '../../types/domain'
 
 const ISO_MONTH_LENGTH = 7
 const RECENT_TRANSACTIONS_SKELETON_COUNT = 3
+const ICON_SIZE = 16
 
 function currentMonthPrefix(): string {
   return new Date().toISOString().slice(0, ISO_MONTH_LENGTH)
@@ -29,6 +30,7 @@ export function FinansPage() {
   const categories = useFinanceCategoriesStore((s) => s.categories)
   const areas = useLifeAreasStore((s) => s.areas)
   const [formKey, setFormKey] = useState(0)
+  const [showForm, setShowForm] = useState(false)
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? id
   const areaName = (id: string) => areas.find((a) => a.id === id)?.name ?? id
@@ -43,9 +45,32 @@ export function FinansPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader icon={Wallet} title="Finans" />
+      <PageHeader
+        icon={Wallet}
+        title="Finans"
+        actions={
+          <Button variant="primary" size="sm" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? <X size={ICON_SIZE} /> : <Plus size={ICON_SIZE} />}
+            {showForm ? 'Vazgeç' : 'İşlem ekle'}
+          </Button>
+        }
+      />
 
-      <TransactionForm key={formKey} onCreated={() => setFormKey((k) => k + 1)} />
+      <div
+        className={`grid transition-all motion-safe:duration-300 ${
+          showForm ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <TransactionForm
+            key={formKey}
+            onCreated={() => {
+              setFormKey((k) => k + 1)
+              setShowForm(false)
+            }}
+          />
+        </div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <MagnitudeBreakdown
