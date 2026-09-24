@@ -7,12 +7,13 @@ import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { deleteTransaction } from '../../services/repositories/financeTransactionsRepository'
 import { formatTRY } from '../../lib/format'
 import { TransactionForm } from './TransactionForm'
-import { MagnitudeBreakdown, type BreakdownItem } from './MagnitudeBreakdown'
+import { MagnitudeBreakdown } from './MagnitudeBreakdown'
 import { BudgetComparison } from './BudgetComparison'
 import { SkeletonLines } from '../../components/Skeleton'
 import { PageHeader } from '../../components/PageHeader'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
+import { buildBreakdown } from '../../lib/financeBreakdown'
 import type { FinanceTransaction } from '../../types/domain'
 
 const ISO_MONTH_LENGTH = 7
@@ -20,20 +21,6 @@ const RECENT_TRANSACTIONS_SKELETON_COUNT = 3
 
 function currentMonthPrefix(): string {
   return new Date().toISOString().slice(0, ISO_MONTH_LENGTH)
-}
-
-function buildBreakdown(
-  transactions: FinanceTransaction[],
-  keyOf: (tx: FinanceTransaction) => string | undefined,
-  labelOf: (id: string) => string,
-): BreakdownItem[] {
-  const totals = new Map<string, number>()
-  for (const tx of transactions) {
-    const key = keyOf(tx)
-    if (!key) continue
-    totals.set(key, (totals.get(key) ?? 0) + tx.amountTRY)
-  }
-  return [...totals.entries()].map(([id, amount]) => ({ id, label: labelOf(id), amount }))
 }
 
 export function FinansPage() {

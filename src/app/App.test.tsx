@@ -15,6 +15,7 @@ vi.mock('../services/repositories/settingsRepository', () => ({
       },
       appearance: { theme: 'system' },
       reviewRhythms: { daily: true, weekly: true, monthly: true, yearly: true },
+      dashboard: { upcomingWindowDays: 7 },
     })
     return () => {}
   },

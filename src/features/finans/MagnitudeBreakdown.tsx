@@ -1,13 +1,10 @@
 import { formatTRY } from '../../lib/format'
 import { Card } from '../../components/Card'
+import type { BreakdownItem } from '../../lib/financeBreakdown'
 
 const PERCENT_MAX = 100
 
-export interface BreakdownItem {
-  id: string
-  label: string
-  amount: number
-}
+export type { BreakdownItem }
 
 /**
  * Kategoriler arası büyüklük karşılaştırması — kimlik (hue) değil miktar sırası

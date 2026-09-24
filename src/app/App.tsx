@@ -3,6 +3,7 @@ import { signOut } from 'firebase/auth'
 import {
   CalendarDays,
   Clock,
+  LayoutDashboard,
   LogOut,
   Settings,
   Target,
@@ -14,6 +15,7 @@ import { useUserDataSync } from '../hooks/useUserDataSync'
 import { useApplyTheme } from '../hooks/useApplyTheme'
 import { useSettingsStore } from '../stores/settingsStore'
 import { UidProvider } from './UidContext'
+import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { BugunPage } from '../features/bugun/BugunPage'
 import { TakvimPage } from '../features/takvim/TakvimPage'
 import { HayatAlanlariPage } from '../features/hayat-alanlari/HayatAlanlariPage'
@@ -21,7 +23,8 @@ import { FinansPage } from '../features/finans/FinansPage'
 import { AyarlarPage } from '../features/ayarlar/AyarlarPage'
 
 const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: LucideIcon }[] = [
-  { to: '/', label: 'Bugün', end: true, icon: Clock },
+  { to: '/', label: 'Genel Bakış', end: true, icon: LayoutDashboard },
+  { to: '/bugun', label: 'Bugün', icon: Clock },
   { to: '/takvim', label: 'Takvim', icon: CalendarDays },
   { to: '/hayat-alanlari', label: 'Hayat Alanları', icon: Target },
   { to: '/finans', label: 'Finans', icon: Wallet },
@@ -77,7 +80,8 @@ export function App({ uid }: { uid: string }) {
         </nav>
         <main className="mx-auto max-w-5xl px-4 py-8">
           <Routes>
-            <Route path="/" element={<BugunPage />} />
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/bugun" element={<BugunPage />} />
             <Route path="/takvim" element={<TakvimPage />} />
             <Route path="/hayat-alanlari" element={<HayatAlanlariPage />} />
             <Route path="/finans" element={<FinansPage />} />

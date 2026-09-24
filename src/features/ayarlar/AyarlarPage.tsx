@@ -35,6 +35,7 @@ const DETAIL_WINDOW_MIN = 0
 const BUFFER_RATIO_MIN = 0
 const BUFFER_RATIO_MAX = 1
 const BUFFER_RATIO_STEP = 0.05
+const UPCOMING_WINDOW_MIN = 1
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -103,6 +104,22 @@ export function AyarlarPage() {
             <option value="USD">USD ($)</option>
             <option value="EUR">EUR (€)</option>
           </select>
+        </Field>
+      </Section>
+
+      <Section title="Genel Bakış">
+        <Field label="Yaklaşan görevler penceresi (gün)">
+          <input
+            type="number"
+            min={UPCOMING_WINDOW_MIN}
+            className={inputClass}
+            value={settings.dashboard.upcomingWindowDays}
+            onChange={(e) =>
+              void update({
+                dashboard: { upcomingWindowDays: Number(e.target.value) },
+              })
+            }
+          />
         </Field>
       </Section>
 
