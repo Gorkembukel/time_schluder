@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { format, subMilliseconds } from 'date-fns'
 import { tr } from 'date-fns/locale'
-import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, GitBranchPlus, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { deleteTask } from '../../services/repositories/tasksRepository'
+import {
+  createTasksBatch,
+  deleteTask,
+  newTaskId,
+} from '../../services/repositories/tasksRepository'
+import { BREAKDOWN_SCALES, planBreakdown } from '../../lib/autoPlanner'
 import { finerScale } from '../../lib/planning-engine'
 import { defaultChildRange, rollupProgress } from '../../lib/taskHierarchy'
 import { Badge } from '../../components/Badge'
@@ -35,13 +40,35 @@ export function GoalNode({
   /** Ölçek listesinde (ağacın kökü değilken) üst hiyerarşiyi göstermek için. */
   showBreadcrumb?: boolean
 }) {
-  const { index, children } = useTaskHierarchy()
+  const { tasks, index, children } = useTaskHierarchy()
+  const weekStartsOn = useSettingsStore((s) => s.settings.calendarTime.weekStartsOn)
+  const detailWindowDays = useSettingsStore((s) => s.settings.planningEngine.detailWindowDays)
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const kids = children.get(task.id) ?? []
+  const canBreakDown = task.status !== 'done' && BREAKDOWN_SCALES.includes(task.scale)
+
+  /** Yukarıdan aşağı kırılım: bu hedefi rolling wave penceresi içindeki alt dönemlere böler. */
+  async function handleBreakdown() {
+    const drafts = planBreakdown({
+      tasks,
+      now: new Date(),
+      weekStartsOn,
+      detailWindowDays,
+      newId: () => newTaskId(uid),
+      rootIds: [task.id],
+    })
+    if (drafts.length === 0) {
+      setError('Kırılacak yeni dönem yok (alt dönemler zaten var ya da pencere dışında).')
+      return
+    }
+    setError(null)
+    await createTasksBatch(uid, drafts)
+    setExpanded(true)
+  }
 
   async function handleDelete() {
     if (kids.length > 0) {
@@ -92,6 +119,17 @@ export function GoalNode({
             {format(subMilliseconds(new Date(task.endAt), ONE_MS), DATE_FORMAT, { locale: tr })}
           </span>
           <StatusControl uid={uid} task={task} />
+          {canBreakDown && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleBreakdown()}
+              aria-label="Alt dönemlere kır"
+              title="Alt dönemlere kır (3 Yıl → Yıl → Ay → Hafta)"
+            >
+              <GitBranchPlus size={ICON_SIZE} />
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label="Düzenle">
             <Pencil size={ICON_SIZE} />
           </Button>

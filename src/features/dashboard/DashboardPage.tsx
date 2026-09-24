@@ -7,7 +7,7 @@ import { useTransactions } from '../../hooks/useTransactions'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { dayRange } from '../../lib/dateRange'
+import { dayRange, weekRange } from '../../lib/dateRange'
 import { formatTRY } from '../../lib/format'
 import { buildBreakdown } from '../../lib/financeBreakdown'
 import { PageHeader } from '../../components/PageHeader'
@@ -15,6 +15,7 @@ import { StatTile } from '../../components/StatTile'
 import { MagnitudeBreakdown } from '../finans/MagnitudeBreakdown'
 import { UpcomingTasksCard } from './UpcomingTasksCard'
 import { LifeAreaProgressCard } from './LifeAreaProgressCard'
+import { GuidancePanel } from '../rehber/GuidancePanel'
 
 const ISO_MONTH_LENGTH = 7
 
@@ -28,6 +29,7 @@ export function DashboardPage() {
   const areas = useLifeAreasStore((s) => s.areas)
   const categories = useFinanceCategoriesStore((s) => s.categories)
   const upcomingWindowDays = useSettingsStore((s) => s.settings.dashboard.upcomingWindowDays)
+  const weekStartsOn = useSettingsStore((s) => s.settings.calendarTime.weekStartsOn)
   const { transactions } = useTransactions(uid)
 
   const { start: todayStart } = dayRange(today)
@@ -73,7 +75,12 @@ export function DashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={Clock} label="Bugünkü görevler" value={String(todayTaskCount)} variant="primary" />
+        <StatTile
+          icon={Clock}
+          label="Bugünkü görevler"
+          value={String(todayTaskCount)}
+          variant="primary"
+        />
         <StatTile
           icon={ListTodo}
           label={`Önümüzdeki ${upcomingWindowDays} gün`}
@@ -94,6 +101,8 @@ export function DashboardPage() {
           variant={overBudgetCount > 0 ? 'danger' : 'success'}
         />
       </div>
+
+      <GuidancePanel period={weekRange(today, weekStartsOn)} periodScale="week" />
 
       <div className="grid gap-4 md:grid-cols-2">
         <UpcomingTasksCard tasks={upcomingTasks} loading={tasksLoading} />

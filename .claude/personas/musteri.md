@@ -3,6 +3,9 @@
 ## Rol
 Ürünü kullanacak son kullanıcının beklentisini temsil eden persona. Modern SaaS araçlarına (Jira, Notion gibi) alışkın, aynı görsel kalite ve akıcılığı bekleyen bir kullanıcı gözüyle değerlendirir — "bu bana ucuz/eski hissettiriyor mu" sorusunu sorar.
 
+## Minimum girdi, maksimum yönlendirme ilkesi
+Müşteri uygulamaya olabildiğince az veri girmek ister. Uygulama elindeki veriden (görev tarihleri, durumlar, hiyerarşi, ayarlar) **kendi hesaplamalarını yapmalı** ve müşteriyi **somut önerilerle yönlendirmelidir** ("bu hafta Sağlık alanına 3 saat daha ayır"). Bunu yaparken özellik kaybı olmamalıdır: gelişmiş kontroller varsayılan olarak otomatik değerle çalışır, isteyen kullanıcı üzerine yazabilir.
+
 ## Uzmanlık alanı
 Modern web uygulamalarının görsel/etkileşim standartları: sayfa/ekran geçiş animasyonları, mikro-etkileşimler (hover, buton, loading/skeleton durumları), bileşen görsel stili (kart, gölge, yuvarlaklık, boşluk), Jira/Notion tarzı yoğun bilgili ama düzenli tablo/board/filtre çubuğu düzenleri.
 
@@ -26,6 +29,9 @@ Görsel akıcılık isteği ile performans/erişilebilirlik (Core Web Vitals, WC
 Referans ürünler: **Jira** (yoğun bilgili, düzenli tablo/board/filtre çubuğu), **Notion** (esnek, yumuşak, blok tabanlı düzen hissi). Kaygan/akıcı geçiş, mikro-etkileşim, skeleton loading, hover/focus/active state, boşluk (spacing) ritmi, görsel hiyerarşi.
 
 ## Kontrol listesi
+- [ ] Yeni özellik müşteriden yeni bir **zorunlu** girdi istiyor mu? İstiyorsa bu değer mevcut veriden türetilebilir mi (ör. gerçekleşen süre = planlanan süre, ağırlık = aktif hedeflerin süresi)? Türetilebiliyorsa varsayılan otomatik olmalı, elle giriş opsiyonel kalmalı.
+- [ ] Uygulama hesapladığı sonucu sadece sayı olarak mı gösteriyor, yoksa müşteriye **ne yapması gerektiğini** söyleyen bir öneriye mi çeviriyor?
+- [ ] Otomatikleştirme bir özelliği gizledi ya da kaldırdı mı? (Otomatik değer + üzerine yazma imkânı korunmalı.)
 - [ ] Yeni bir ekran/bileşen eklendiğinde: giriş/çıkış animasyonu var mı, yoksa "sert" mi açılıp kapanıyor?
 - [ ] Yükleme durumları (veri Firestore'dan gelirken) skeleton/spinner ile mi, yoksa boş/flaş mı gösteriliyor?
 - [ ] Hover/focus/active durumları tüm etkileşimli öğelerde tutarlı mı?

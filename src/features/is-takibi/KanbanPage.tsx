@@ -29,6 +29,8 @@ import {
 import { OverdueBadge } from './OverdueBadge'
 import { TaskBreadcrumb } from './TaskBreadcrumb'
 import { ProgressBar } from './ProgressBar'
+import { DependencyChips, DependencyHandle, DependencyTypePicker } from './dependencies'
+import { useDependencyDropTarget } from './dependencyDrag'
 
 const ICON_SIZE = 14
 const DATE_FORMAT = 'd MMM'
@@ -88,7 +90,7 @@ export function KanbanPage() {
       <PageHeader
         icon={KanbanSquare}
         title="Pano"
-        subtitle="Tüm ölçeklerdeki işlerin iş akışı — sürükle-bırak ya da oklarla taşı"
+        subtitle="Kartı sürükleyerek ya da oklarla durum değiştir; 🔗 tutamacını başka kartın üzerine bırakarak bağımlılık kur"
       />
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-3 shadow-sm">
@@ -205,15 +207,19 @@ function KanbanCard({
   nextStatus?: TaskStatus
   onMove: (status: TaskStatus) => void
 }) {
+  const { isOver, targetProps, pendingPredecessorId, clearPending } = useDependencyDropTarget(task)
   return (
     <article
       aria-label={task.title}
+      {...targetProps}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_MIME, task.id)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      className="flex cursor-grab flex-col gap-1.5 rounded-lg border border-border bg-surface p-3 shadow-sm transition-shadow active:cursor-grabbing motion-safe:hover:shadow-md"
+      className={`flex cursor-grab flex-col gap-1.5 rounded-lg border bg-surface p-3 shadow-sm transition-shadow active:cursor-grabbing motion-safe:hover:shadow-md ${
+        isOver ? 'border-primary ring-2 ring-primary/30' : 'border-border'
+      }`}
     >
       <TaskBreadcrumb task={task} index={index} />
       <p
@@ -222,6 +228,14 @@ function KanbanCard({
         {task.title}
       </p>
       {progress !== null && <ProgressBar ratio={progress} label={`${task.title} ilerlemesi`} />}
+      <DependencyChips task={task} index={index} />
+      {pendingPredecessorId && (
+        <DependencyTypePicker
+          successor={task}
+          predecessorId={pendingPredecessorId}
+          onDone={clearPending}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5 text-[0.7rem] text-text-secondary">
           <Badge variant="primary">{PLANNING_SCALE_LABELS[task.scale]}</Badge>
@@ -232,6 +246,7 @@ function KanbanCard({
           <OverdueBadge task={task} />
         </div>
         <div className="flex gap-0.5">
+          <DependencyHandle task={task} />
           {prevStatus && (
             <button
               type="button"

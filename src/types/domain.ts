@@ -46,10 +46,21 @@ export type TransactionType = 'income' | 'expense'
 
 export type NeedWant = 'need' | 'want'
 
+/** Hayat alanı önceliği — backcast ağırlığının çarpanı (Ayarlar > Planlama Motoru). Opsiyonel; yoksa `normal`. */
+export const LIFE_AREA_PRIORITIES = ['low', 'normal', 'high'] as const
+export type LifeAreaPriority = (typeof LIFE_AREA_PRIORITIES)[number]
+
+export const LIFE_AREA_PRIORITY_LABELS: Record<LifeAreaPriority, string> = {
+  low: 'Düşük',
+  normal: 'Normal',
+  high: 'Yüksek',
+}
+
 export interface LifeArea {
   id: string
   name: string
   order: number
+  priority?: LifeAreaPriority
   createdAt: string
   updatedAt: string
 }
@@ -102,6 +113,25 @@ export interface Task {
   dependencies: TaskDependency[]
   bufferMinutes: number
   detailLevel: DetailLevel
+  /** Gerçekleşen süre (dk). Opsiyonel — yoksa forecast planlanan süreyi kullanır (minimum girdi ilkesi). */
+  actualMinutes?: number
+  /** Tamamlandı'ya geçtiği an (oyunlaştırma: seri ve zamanında bitirme bonusu için). */
+  completedAt?: string
+}
+
+/**
+ * Her hafta tekrar eden sabit blok (ders programı, rutin). Haftalık programda dolu kabul edilir;
+ * otomatik dağıtım bu saatlere iş yerleştirmez. Saatler yerel "HH:mm".
+ */
+export interface Routine {
+  id: string
+  title: string
+  /** ISO 8601 gün numaraları: 1 = Pazartesi … 7 = Pazar */
+  weekdays: number[]
+  startTime: string
+  endTime: string
+  lifeAreaId?: string
+  createdAt: string
 }
 
 export interface FxSnapshot {

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UidProvider } from '../../app/UidContext'
@@ -9,9 +9,14 @@ import { KanbanPage } from './KanbanPage'
 
 vi.mock('../../services/repositories/tasksRepository', () => ({
   updateTaskStatus: vi.fn().mockResolvedValue(undefined),
+  updateTaskDependencies: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { updateTaskStatus } from '../../services/repositories/tasksRepository'
+import {
+  updateTaskDependencies,
+  updateTaskStatus,
+} from '../../services/repositories/tasksRepository'
+import { DEPENDENCY_DRAG_MIME } from './dependencyDrag'
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -29,6 +34,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
 
 beforeEach(() => {
   vi.mocked(updateTaskStatus).mockClear()
+  vi.mocked(updateTaskDependencies).mockClear()
   useLifeAreasStore.setState({
     areas: [{ id: 'saglik', name: 'Sağlık', order: 0, createdAt: '', updatedAt: '' }],
     loading: false,
@@ -89,5 +95,36 @@ describe('KanbanPage', () => {
     await userEvent.click(screen.getByLabelText('Sadece gecikenler'))
     expect(screen.queryByRole('article', { name: 'Maraton koş' })).not.toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Ayakkabı al' })).toBeInTheDocument()
+  })
+
+  it('bir işin tutamacı başka işin üzerine bırakılınca tür seçtirip bağımlılık kaydeder', async () => {
+    renderPage()
+    const target = screen.getByRole('article', { name: 'Maraton koş' })
+    const dataTransfer = {
+      types: [DEPENDENCY_DRAG_MIME],
+      getData: (type: string) => (type === DEPENDENCY_DRAG_MIME ? 'late' : ''),
+    }
+    fireEvent.dragOver(target, { dataTransfer })
+    fireEvent.drop(target, { dataTransfer })
+    await userEvent.click(within(target).getByRole('button', { name: /^SS/ }))
+    expect(updateTaskDependencies).toHaveBeenCalledWith('test-uid', 'epic', [
+      { taskId: 'late', type: 'SS', lagMinutes: 0 },
+    ])
+  })
+
+  it('döngü oluşturacak bağı reddeder', () => {
+    renderPage()
+    // late zaten epic'e bağlı; epic'i late'e bağlamak döngü yaratır.
+    useTasksStore.setState((s) => ({
+      tasks: s.tasks.map((t) =>
+        t.id === 'late'
+          ? { ...t, dependencies: [{ taskId: 'epic', type: 'FS', lagMinutes: 0 }] }
+          : t,
+      ),
+    }))
+    const target = screen.getByRole('article', { name: 'Maraton koş' })
+    const dataTransfer = { types: [DEPENDENCY_DRAG_MIME], getData: () => 'late' }
+    fireEvent.drop(target, { dataTransfer })
+    expect(within(target).getByText(/Döngü oluşur/)).toBeInTheDocument()
   })
 })

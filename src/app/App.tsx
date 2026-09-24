@@ -1,7 +1,9 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import {
+  Bot,
   CalendarDays,
+  CalendarRange,
   Clock,
   KanbanSquare,
   LayoutDashboard,
@@ -20,6 +22,8 @@ import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { BugunPage } from '../features/bugun/BugunPage'
 import { TakvimPage } from '../features/takvim/TakvimPage'
 import { KanbanPage } from '../features/is-takibi/KanbanPage'
+import { ProgramPage } from '../features/program/ProgramPage'
+import { RobotPage } from '../features/robot/RobotPage'
 import { HayatAlanlariPage } from '../features/hayat-alanlari/HayatAlanlariPage'
 import { FinansPage } from '../features/finans/FinansPage'
 import { AyarlarPage } from '../features/ayarlar/AyarlarPage'
@@ -28,7 +32,9 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: LucideIcon }[
   { to: '/', label: 'Genel Bakış', end: true, icon: LayoutDashboard },
   { to: '/bugun', label: 'Bugün', icon: Clock },
   { to: '/takvim', label: 'Takvim', icon: CalendarDays },
+  { to: '/program', label: 'Program', icon: CalendarRange },
   { to: '/pano', label: 'Pano', icon: KanbanSquare },
+  { to: '/robot', label: 'Robot', icon: Bot },
   { to: '/hayat-alanlari', label: 'Hayat Alanları', icon: Target },
   { to: '/finans', label: 'Finans', icon: Wallet },
   { to: '/ayarlar', label: 'Ayarlar', icon: Settings },
@@ -86,7 +92,9 @@ export function App({ uid }: { uid: string }) {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/bugun" element={<BugunPage />} />
             <Route path="/takvim" element={<TakvimPage />} />
+            <Route path="/program" element={<ProgramPage />} />
             <Route path="/pano" element={<KanbanPage />} />
+            <Route path="/robot" element={<RobotPage />} />
             <Route path="/hayat-alanlari" element={<HayatAlanlariPage />} />
             <Route path="/finans" element={<FinansPage />} />
             <Route path="/ayarlar" element={<AyarlarPage />} />
