@@ -20,6 +20,9 @@ export const auth = getAuth(app)
 
 // Spark plan günlük okuma kotasını korumak için offline persistence + çoklu sekme
 // desteği açık (bkz. docs/decisions/0003-firestore-veri-modeli.md, "Kota koruma stratejisi").
+// ignoreUndefinedProperties: opsiyonel alanları (ör. lifeAreaId, requirementId) `undefined`
+// bırakabilmek için — Firestore SDK varsayılan olarak undefined değerlerde hata fırlatır.
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  ignoreUndefinedProperties: true,
 })

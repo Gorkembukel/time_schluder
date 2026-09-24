@@ -21,6 +21,10 @@ export function subscribeRequirements(
   areaId: string,
   onChange: (requirements: Requirement[]) => void,
 ): Unsubscribe {
+  if (!areaId) {
+    onChange([])
+    return () => {}
+  }
   const q = query(requirementsCollectionRef(uid, areaId), orderBy('createdAt'))
   return onSnapshot(q, (snapshot) => {
     onChange(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Requirement))
