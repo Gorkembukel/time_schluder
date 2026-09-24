@@ -5,21 +5,50 @@
  * Buradaki değerler yalnızca ilk kurulum / Ayarlar sayfası varsayılanlarıdır —
  * gerçek değerler kullanıcı ayarlarından (Firestore) okunur.
  */
-import type { PlanningScale } from '../types/domain'
+import type { PlanningScale, Theme } from '../types/domain'
 
-export const DEFAULT_SETTINGS = {
+export interface Settings {
+  general: {
+    language: string
+    currency: string
+  }
+  calendarTime: {
+    /** ISO 8601: 1 = Pazartesi */
+    weekStartsOn: number
+    dayStartHour: number
+    dayEndHour: number
+  }
+  planningEngine: {
+    /** Rolling wave detaylandırma penceresi (gün cinsinden). Kullanıcı onboarding'de değiştirir. */
+    detailWindowDays: Record<PlanningScale, number>
+    bufferRatio: number
+    majorChangeThreshold: {
+      affectedTaskCount: number
+      criticalPathChanged: boolean
+    }
+  }
+  appearance: {
+    theme: Theme
+  }
+  reviewRhythms: {
+    daily: boolean
+    weekly: boolean
+    monthly: boolean
+    yearly: boolean
+  }
+}
+
+export const DEFAULT_SETTINGS: Settings = {
   general: {
     language: 'tr',
     currency: 'TRY',
   },
   calendarTime: {
-    /** ISO 8601: 1 = Pazartesi */
     weekStartsOn: 1,
     dayStartHour: 6,
     dayEndHour: 23,
   },
   planningEngine: {
-    /** Rolling wave detaylandırma penceresi (gün cinsinden). Kullanıcı onboarding'de değiştirir. */
     detailWindowDays: {
       year3: 365,
       year: 90,
@@ -27,7 +56,7 @@ export const DEFAULT_SETTINGS = {
       week: 2,
       day: 1,
       hour: 0,
-    } satisfies Record<PlanningScale, number>,
+    },
     bufferRatio: 0.15,
     majorChangeThreshold: {
       affectedTaskCount: 3,
@@ -35,7 +64,7 @@ export const DEFAULT_SETTINGS = {
     },
   },
   appearance: {
-    theme: 'system' as const,
+    theme: 'system',
   },
   reviewRhythms: {
     daily: true,

@@ -1,4 +1,9 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
+import { signOut } from 'firebase/auth'
+import { auth } from '../services/firebase'
+import { useUserDataSync } from '../hooks/useUserDataSync'
+import { useApplyTheme } from '../hooks/useApplyTheme'
+import { useSettingsStore } from '../stores/settingsStore'
 import { BugunPage } from '../features/bugun/BugunPage'
 import { TakvimPage } from '../features/takvim/TakvimPage'
 import { HayatAlanlariPage } from '../features/hayat-alanlari/HayatAlanlariPage'
@@ -13,11 +18,15 @@ const NAV_ITEMS = [
   { to: '/ayarlar', label: 'Ayarlar' },
 ]
 
-export function App() {
+export function App({ uid }: { uid: string }) {
+  useUserDataSync(uid)
+  const theme = useSettingsStore((s) => s.settings.appearance.theme)
+  useApplyTheme(theme)
+
   return (
     <div className="min-h-screen bg-bg text-text">
       <nav className="border-b border-border bg-surface">
-        <ul className="mx-auto flex max-w-3xl gap-1 px-4 py-2">
+        <ul className="mx-auto flex max-w-3xl items-center gap-1 px-4 py-2">
           {NAV_ITEMS.map((item) => (
             <li key={item.to}>
               <NavLink
@@ -35,6 +44,15 @@ export function App() {
               </NavLink>
             </li>
           ))}
+          <li className="ml-auto">
+            <button
+              type="button"
+              onClick={() => void signOut(auth)}
+              className="text-sm text-text-secondary hover:text-text"
+            >
+              Çıkış yap
+            </button>
+          </li>
         </ul>
       </nav>
       <main className="mx-auto max-w-3xl px-4 py-8">
