@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Layers, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, Layers, Plus, Trash2 } from 'lucide-react'
 import {
   deleteLifeArea,
   renameLifeArea,
@@ -40,6 +40,8 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   const [nameDraft, setNameDraft] = useState(area.name)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [showNewRequirement, setShowNewRequirement] = useState(false)
+  // Gereklilikler varsayılan olarak katlı: kart sadece hedefleri ve kısa bir özet gösterir.
+  const [requirementsOpen, setRequirementsOpen] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -116,44 +118,80 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
 
       <AreaGoals areaId={area.id} />
 
-      <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+      <button
+        type="button"
+        onClick={() => setRequirementsOpen((v) => !v)}
+        aria-expanded={requirementsOpen}
+        className="mt-4 flex w-full items-center gap-1.5 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary hover:text-text"
+      >
+        <ChevronRight
+          size={ICON_SIZE}
+          className={`transition-transform motion-safe:duration-150 ${requirementsOpen ? 'rotate-90' : ''}`}
+        />
         Gereklilikler
-      </h3>
-      <div className="mt-2 flex flex-col gap-2">
-        {loading ? (
-          <SkeletonLines count={LOADING_ROW_COUNT} className="h-10" />
-        ) : requirements.length === 0 ? (
-          <p className="text-sm text-text-secondary">Henüz gereklilik yok.</p>
-        ) : (
-          requirements.map((requirement) => (
-            <RequirementRow
-              key={requirement.id}
+        <span className="font-normal normal-case tracking-normal">
+          (
+          {loading
+            ? '…'
+            : `${requirements.length} adet, ortalama %${averageProgress(requirements)}`}
+          )
+        </span>
+      </button>
+      {requirementsOpen && (
+        <>
+          <div className="mt-2 flex flex-col gap-2">
+            {loading ? (
+              <SkeletonLines count={LOADING_ROW_COUNT} className="h-10" />
+            ) : requirements.length === 0 ? (
+              <p className="text-sm text-text-secondary">Henüz gereklilik yok.</p>
+            ) : (
+              requirements.map((requirement) => (
+                <RequirementRow
+                  key={requirement.id}
+                  uid={uid}
+                  areaId={area.id}
+                  requirement={requirement}
+                />
+              ))
+            )}
+          </div>
+
+          {showNewRequirement ? (
+            <NewRequirementForm
               uid={uid}
               areaId={area.id}
-              requirement={requirement}
+              onDone={() => setShowNewRequirement(false)}
             />
-          ))
-        )}
-      </div>
-
-      {showNewRequirement ? (
-        <NewRequirementForm
-          uid={uid}
-          areaId={area.id}
-          onDone={() => setShowNewRequirement(false)}
-        />
-      ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowNewRequirement(true)}
-          className="mt-3"
-        >
-          <Plus size={ICON_SIZE} />
-          Gereklilik ekle
-        </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowNewRequirement(true)}
+              className="mt-3"
+            >
+              <Plus size={ICON_SIZE} />
+              Gereklilik ekle
+            </Button>
+          )}
+        </>
       )}
     </Card>
+  )
+}
+
+function requirementProgress(requirement: Requirement): number {
+  return requirement.targetMetric > 0
+    ? Math.min(
+        PROGRESS_MAX_PERCENT,
+        Math.round((requirement.currentValue / requirement.targetMetric) * PROGRESS_MAX_PERCENT),
+      )
+    : 0
+}
+
+function averageProgress(requirements: Requirement[]): number {
+  if (requirements.length === 0) return 0
+  return Math.round(
+    requirements.reduce((sum, r) => sum + requirementProgress(r), 0) / requirements.length,
   )
 }
 
@@ -170,13 +208,7 @@ function RequirementRow({
   const { tasks, index } = useTaskHierarchy()
   const linkedTasks = tasks.filter((t) => effectiveRequirementId(t, index) === requirement.id)
   const linkedDone = linkedTasks.filter((t) => t.status === 'done').length
-  const progress =
-    requirement.targetMetric > 0
-      ? Math.min(
-          PROGRESS_MAX_PERCENT,
-          Math.round((requirement.currentValue / requirement.targetMetric) * PROGRESS_MAX_PERCENT),
-        )
-      : 0
+  const progress = requirementProgress(requirement)
 
   return (
     <div className="rounded-lg border border-border bg-bg/50 p-3">
