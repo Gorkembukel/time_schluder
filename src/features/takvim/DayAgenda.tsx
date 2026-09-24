@@ -4,6 +4,9 @@ import { useTasksInRange } from '../../hooks/useTasksInRange'
 import { dayRange } from '../../lib/dateRange'
 import { TaskForm } from './TaskForm'
 import { TaskRow } from './TaskRow'
+import { SkeletonLines } from '../../components/Skeleton'
+
+const LOADING_ROW_COUNT = 3
 
 /** Belirli bir günün görev listesi + hızlı ekleme formu. Bugün ve Takvim (gün sekmesi) tarafından paylaşılır. */
 export function DayAgenda({ date }: { date: Date }) {
@@ -19,7 +22,7 @@ export function DayAgenda({ date }: { date: Date }) {
       <TaskForm key={formKey} defaultDate={date} onCreated={() => setFormKey((k) => k + 1)} />
       <div className="rounded-xl border border-border bg-surface p-5">
         {loading ? (
-          <p className="text-sm text-text-secondary">Yükleniyor…</p>
+          <SkeletonLines count={LOADING_ROW_COUNT} />
         ) : sorted.length === 0 ? (
           <p className="text-sm text-text-secondary">Bu gün için görev yok.</p>
         ) : (

@@ -3,6 +3,9 @@ import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { createLifeArea } from '../../services/repositories/lifeAreasRepository'
 import { AreaCard } from './AreaCard'
+import { Skeleton } from '../../components/Skeleton'
+
+const LOADING_CARD_COUNT = 2
 
 export function HayatAlanlariPage() {
   const uid = useUid()
@@ -38,7 +41,11 @@ export function HayatAlanlariPage() {
       </form>
 
       {loading ? (
-        <p className="text-text-secondary">Hayat alanları yükleniyor…</p>
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: LOADING_CARD_COUNT }, (_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
       ) : areas.length === 0 ? (
         <p className="text-text-secondary">
           Henüz hayat alanı yok. İlerlemek istediğin bir alan ekleyerek başla.

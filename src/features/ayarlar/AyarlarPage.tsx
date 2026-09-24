@@ -3,7 +3,10 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
 import { updateCategoryBudget } from '../../services/repositories/financeCategoriesRepository'
 import { useUid } from '../../app/UidContext'
+import { Skeleton } from '../../components/Skeleton'
 import { PLANNING_SCALES, type PlanningScale, type Theme } from '../../types/domain'
+
+const LOADING_SECTION_COUNT = 3
 
 const SCALE_LABELS: Record<PlanningScale, string> = {
   year3: '3 Yıl',
@@ -59,7 +62,14 @@ export function AyarlarPage() {
   const categories = useFinanceCategoriesStore((s) => s.categories)
 
   if (loading) {
-    return <p className="text-text-secondary">Ayarlar yükleniyor…</p>
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-7 w-32" />
+        {Array.from({ length: LOADING_SECTION_COUNT }, (_, i) => (
+          <Skeleton key={i} className="h-28" />
+        ))}
+      </div>
+    )
   }
 
   function handleNumberChange(
@@ -215,7 +225,11 @@ export function AyarlarPage() {
 
       <Section title="Finans — Kategoriler">
         {categories.length === 0 ? (
-          <p className="text-sm text-text-secondary">Kategoriler yükleniyor…</p>
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-6 w-20" />
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-6 w-16" />
+          </div>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {categories.map((category) => (
@@ -235,7 +249,7 @@ export function AyarlarPage() {
 
       <Section title="Finans — Bütçe (aylık, TRY)">
         {categories.filter((c) => c.kind === 'expense').length === 0 ? (
-          <p className="text-sm text-text-secondary">Kategoriler yükleniyor…</p>
+          <Skeleton className="h-24" />
         ) : (
           categories
             .filter((c) => c.kind === 'expense')

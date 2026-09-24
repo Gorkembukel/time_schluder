@@ -8,9 +8,11 @@ import { formatTRY } from '../../lib/format'
 import { TransactionForm } from './TransactionForm'
 import { MagnitudeBreakdown, type BreakdownItem } from './MagnitudeBreakdown'
 import { BudgetComparison } from './BudgetComparison'
+import { SkeletonLines } from '../../components/Skeleton'
 import type { FinanceTransaction } from '../../types/domain'
 
 const ISO_MONTH_LENGTH = 7
+const RECENT_TRANSACTIONS_SKELETON_COUNT = 3
 
 function currentMonthPrefix(): string {
   return new Date().toISOString().slice(0, ISO_MONTH_LENGTH)
@@ -72,7 +74,7 @@ export function FinansPage() {
       <div className="rounded-xl border border-border bg-surface p-5">
         <h2 className="text-sm font-semibold text-text">Son işlemler</h2>
         {loading ? (
-          <p className="mt-3 text-sm text-text-secondary">Yükleniyor…</p>
+          <SkeletonLines count={RECENT_TRANSACTIONS_SKELETON_COUNT} className="mt-3" />
         ) : transactions.length === 0 ? (
           <p className="mt-3 text-sm text-text-secondary">Henüz işlem yok.</p>
         ) : (

@@ -34,11 +34,12 @@ export function App({ uid }: { uid: string }) {
                 <NavLink
                   to={item.to}
                   end={item.end}
+                  viewTransition
                   className={({ isActive }) =>
-                    `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    `rounded-full px-3 py-1.5 text-sm font-medium transition-all motion-safe:duration-150 ${
                       isActive
                         ? 'bg-primary text-primary-text'
-                        : 'text-text-secondary hover:text-text'
+                        : 'text-text-secondary hover:bg-border/60 hover:text-text'
                     }`
                   }
                 >
@@ -50,7 +51,7 @@ export function App({ uid }: { uid: string }) {
               <button
                 type="button"
                 onClick={() => void signOut(auth)}
-                className="text-sm text-text-secondary hover:text-text"
+                className="text-sm text-text-secondary transition-colors hover:text-text"
               >
                 Çıkış yap
               </button>

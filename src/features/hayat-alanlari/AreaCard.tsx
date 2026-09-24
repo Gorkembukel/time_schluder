@@ -13,9 +13,11 @@ import {
   type Requirement,
   type RequirementType,
 } from '../../types/domain'
+import { SkeletonLines } from '../../components/Skeleton'
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text'
 const PROGRESS_MAX_PERCENT = 100
+const LOADING_ROW_COUNT = 2
 
 export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   const { requirements, loading } = useRequirements(uid, area.id)
@@ -40,7 +42,7 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-xl border border-border bg-surface p-5 transition-shadow motion-safe:hover:shadow-md">
       <div className="flex items-center justify-between gap-2">
         {editingName ? (
           <input
@@ -91,7 +93,7 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
 
       <div className="mt-4 flex flex-col gap-2">
         {loading ? (
-          <p className="text-sm text-text-secondary">Gereklilikler yükleniyor…</p>
+          <SkeletonLines count={LOADING_ROW_COUNT} className="h-10" />
         ) : requirements.length === 0 ? (
           <p className="text-sm text-text-secondary">Henüz gereklilik yok.</p>
         ) : (
