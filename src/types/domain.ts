@@ -65,6 +65,9 @@ export interface TaskDependency {
 
 export type DetailLevel = 'detailed' | 'rough'
 
+export const TASK_STATUSES = ['planned', 'in-progress', 'done', 'delayed'] as const
+export type TaskStatus = (typeof TASK_STATUSES)[number]
+
 export interface Task {
   id: string
   title: string
@@ -74,7 +77,7 @@ export interface Task {
   parentTaskId?: string
   lifeAreaId?: string
   requirementId?: string
-  status: 'planned' | 'in-progress' | 'done' | 'delayed'
+  status: TaskStatus
   dependencies: TaskDependency[]
   bufferMinutes: number
   detailLevel: DetailLevel
