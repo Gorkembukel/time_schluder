@@ -1,4 +1,12 @@
 export * from './types'
+export {
+  yearRange,
+  year3Range,
+  hourRange,
+  scalePeriodRange,
+  finerScale,
+  coarserScale,
+} from './scales'
 export { buildGraph, detectCycle, topologicalSort } from './dependencyGraph'
 export { computeCriticalPath } from './criticalPath'
 export { determineDetailLevel, evaluateRollingWave } from './rollingWave'
