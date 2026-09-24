@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Wallet } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
@@ -9,6 +10,9 @@ import { TransactionForm } from './TransactionForm'
 import { MagnitudeBreakdown, type BreakdownItem } from './MagnitudeBreakdown'
 import { BudgetComparison } from './BudgetComparison'
 import { SkeletonLines } from '../../components/Skeleton'
+import { PageHeader } from '../../components/PageHeader'
+import { Card } from '../../components/Card'
+import { Button } from '../../components/Button'
 import type { FinanceTransaction } from '../../types/domain'
 
 const ISO_MONTH_LENGTH = 7
@@ -51,8 +55,8 @@ export function FinansPage() {
   const areaBreakdown = buildBreakdown(monthExpenses, (tx) => tx.lifeAreaId, areaName)
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Finans</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader icon={Wallet} title="Finans" />
 
       <TransactionForm key={formKey} onCreated={() => setFormKey((k) => k + 1)} />
 
@@ -71,7 +75,7 @@ export function FinansPage() {
 
       <BudgetComparison categories={categories} monthExpenses={monthExpenses} />
 
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <Card className="p-5">
         <h2 className="text-sm font-semibold text-text">Son işlemler</h2>
         {loading ? (
           <SkeletonLines count={RECENT_TRANSACTIONS_SKELETON_COUNT} className="mt-3" />
@@ -84,7 +88,7 @@ export function FinansPage() {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
@@ -116,30 +120,18 @@ function TransactionRow({
           {formatTRY(tx.amountTRY)}
         </span>
         {confirmingDelete ? (
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => void deleteTransaction(uid, tx.id)}
-              className="font-medium text-danger"
-            >
+          <div className="flex items-center gap-1 text-xs">
+            <Button variant="danger" size="sm" onClick={() => void deleteTransaction(uid, tx.id)}>
               Sil
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="text-text-secondary"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
               Vazgeç
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="text-xs text-text-secondary hover:text-danger"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
             Sil
-          </button>
+          </Button>
         )}
       </div>
     </li>

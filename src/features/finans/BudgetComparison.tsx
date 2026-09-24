@@ -1,5 +1,6 @@
 import { formatTRY } from '../../lib/format'
 import type { FinanceCategory, FinanceTransaction } from '../../types/domain'
+import { Card } from '../../components/Card'
 
 const PERCENT_MAX = 100
 const WARNING_THRESHOLD_PERCENT = 90
@@ -21,7 +22,7 @@ export function BudgetComparison({
   )
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <Card className="p-5">
       <h2 className="text-sm font-semibold text-text">Bu ay bütçe vs. gerçekleşen</h2>
       {budgeted.length === 0 ? (
         <p className="mt-3 text-sm text-text-secondary">
@@ -61,6 +62,6 @@ export function BudgetComparison({
           })}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

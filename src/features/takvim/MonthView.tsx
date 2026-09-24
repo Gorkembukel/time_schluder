@@ -44,7 +44,7 @@ export function MonthView({
             key={day.toISOString()}
             type="button"
             onClick={() => onSelectDay(day)}
-            className={`flex min-h-[5.5rem] flex-col gap-0.5 rounded-lg border p-1.5 text-left transition-all motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md ${
+            className={`flex min-h-[5.5rem] flex-col gap-0.5 rounded-lg border p-1.5 text-left shadow-sm transition-all motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md ${
               isToday(day) ? 'border-primary' : 'border-border hover:border-primary/50'
             } ${inCurrentMonth ? 'bg-surface' : 'bg-bg'}`}
           >

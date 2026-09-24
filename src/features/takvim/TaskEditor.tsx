@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import {
   applyTaskChanges,
   fetchAllTasks,
@@ -8,6 +9,9 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { recalculateFromChange, type RecalculationProposal } from '../../lib/planning-engine'
 import { RecalculationPreview } from './RecalculationPreview'
 import { DEPENDENCY_TYPES, type DependencyType, type Task, type TaskDependency } from '../../types/domain'
+import { Button } from '../../components/Button'
+
+const ICON_SIZE = 14
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text'
 
@@ -198,13 +202,10 @@ export function TaskEditor({
                   {allTasks.find((t) => t.id === dep.taskId)?.title ?? dep.taskId} — {dep.type}
                   {dep.lagMinutes ? ` (${dep.lagMinutes}dk lag)` : ''}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => removeDependency(dep.taskId)}
-                  className="text-text-secondary hover:text-danger"
-                >
+                <Button variant="ghost" size="sm" onClick={() => removeDependency(dep.taskId)}>
+                  <X size={ICON_SIZE} />
                   Kaldır
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -240,30 +241,22 @@ export function TaskEditor({
             placeholder="lag (dk)"
             className={`${inputClass} w-20`}
           />
-          <button
-            type="button"
-            onClick={addDependency}
-            className="rounded-lg border border-border px-2 py-1 text-xs text-text-secondary"
-          >
-            + Ekle
-          </button>
+          <Button variant="secondary" size="sm" onClick={addDependency}>
+            <Plus size={ICON_SIZE} />
+            Ekle
+          </Button>
         </div>
       </div>
 
       {error && <p className="text-xs text-danger">{error}</p>}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void handleSave()}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-text disabled:opacity-60"
-        >
+        <Button variant="primary" size="sm" disabled={saving} onClick={() => void handleSave()}>
           Kaydet
-        </button>
-        <button type="button" onClick={onCancel} className="text-xs text-text-secondary">
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
           Vazgeç
-        </button>
+        </Button>
       </div>
     </div>
   )

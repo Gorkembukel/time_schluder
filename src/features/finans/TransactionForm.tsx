@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import { Plus, TrendingDown, TrendingUp } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useRequirements } from '../../hooks/useRequirements'
 import { useFxSnapshot } from '../../hooks/useFxSnapshot'
 import { createTransaction } from '../../services/repositories/financeTransactionsRepository'
+import { Button } from '../../components/Button'
 import type { NeedWant, TransactionType } from '../../types/domain'
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1.5 text-sm text-text'
@@ -90,7 +92,7 @@ export function TransactionForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-5"
+      className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 shadow-sm"
     >
       <div className="flex gap-2">
         <button
@@ -99,10 +101,11 @@ export function TransactionForm({ onCreated }: { onCreated: () => void }) {
             setType('expense')
             setCategoryId('')
           }}
-          className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             type === 'expense' ? 'bg-danger text-primary-text' : 'bg-bg text-text-secondary'
           }`}
         >
+          <TrendingDown size={16} />
           Gider
         </button>
         <button
@@ -111,10 +114,11 @@ export function TransactionForm({ onCreated }: { onCreated: () => void }) {
             setType('income')
             setCategoryId('')
           }}
-          className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             type === 'income' ? 'bg-success text-primary-text' : 'bg-bg text-text-secondary'
           }`}
         >
+          <TrendingUp size={16} />
           Gelir
         </button>
       </div>
@@ -257,12 +261,10 @@ export function TransactionForm({ onCreated }: { onCreated: () => void }) {
         </div>
       </div>
 
-      <button
-        type="submit"
-        className="self-start rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-text"
-      >
+      <Button type="submit" variant="primary" className="self-start">
+        <Plus size={16} />
         İşlemi ekle
-      </button>
+      </Button>
     </form>
   )
 }

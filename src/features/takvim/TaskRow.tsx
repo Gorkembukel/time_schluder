@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
+import { CheckCircle2, Link2, Pencil, Trash2 } from 'lucide-react'
 import {
   deleteTask,
   fetchAllTasks,
@@ -11,6 +12,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { recalculateFromDeletion } from '../../lib/planning-engine'
 import { TASK_STATUSES, type Task, type TaskStatus } from '../../types/domain'
 import { TaskEditor } from './TaskEditor'
+import { Button } from '../../components/Button'
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   planned: 'Planlandı',
@@ -20,6 +22,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 }
 
 const TIME_FORMAT = 'HH:mm'
+const ICON_SIZE = 14
 
 export function TaskRow({ uid, task }: { uid: string; task: Task }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -36,9 +39,7 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
     await deleteTask(uid, task.id)
     if (affectedTaskIds.length > 0) {
       const cleaned = await stripDependencyReferences(uid, allTasks, task.id)
-      setDeleteNote(
-        `Silindi. ${cleaned.length} görevin bu göreve olan bağımlılığı da kaldırıldı.`,
-      )
+      setDeleteNote(`Silindi. ${cleaned.length} görevin bu göreve olan bağımlılığı da kaldırıldı.`)
     }
   }
 
@@ -58,14 +59,24 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
       <div className="min-w-0">
-        <p className={task.status === 'done' ? 'text-text-secondary line-through' : 'text-text'}>
-          {format(new Date(task.startAt), TIME_FORMAT)}–{format(new Date(task.endAt), TIME_FORMAT)}{' '}
+        <p
+          className={`flex items-center gap-1.5 ${task.status === 'done' ? 'text-text-secondary line-through' : 'text-text'}`}
+        >
+          {task.status === 'done' && <CheckCircle2 size={ICON_SIZE} className="shrink-0 text-success" />}
+          <span className="text-xs font-medium text-text-secondary">
+            {format(new Date(task.startAt), TIME_FORMAT)}–{format(new Date(task.endAt), TIME_FORMAT)}
+          </span>
           {task.title}
         </p>
-        {areaName && <p className="text-xs text-text-secondary">{areaName}</p>}
-        {task.dependencies.length > 0 && (
-          <p className="text-xs text-text-secondary">🔗 {task.dependencies.length} bağımlılık</p>
-        )}
+        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+          {areaName && <span>{areaName}</span>}
+          {task.dependencies.length > 0 && (
+            <span className="flex items-center gap-1">
+              <Link2 size={12} />
+              {task.dependencies.length} bağımlılık
+            </span>
+          )}
+        </div>
         {deleteNote && <p className="text-xs text-warning">{deleteNote}</p>}
       </div>
       <div className="flex items-center gap-2">
@@ -80,34 +91,24 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="text-xs text-text-secondary hover:text-text"
-        >
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          <Pencil size={ICON_SIZE} />
           Düzenle
-        </button>
+        </Button>
         {confirmingDelete ? (
-          <div className="flex items-center gap-2 text-xs">
-            <button type="button" onClick={() => void handleDelete()} className="font-medium text-danger">
+          <div className="flex items-center gap-1 text-xs">
+            <Button variant="danger" size="sm" onClick={() => void handleDelete()}>
               Sil
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="text-text-secondary"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
               Vazgeç
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="text-xs text-text-secondary hover:text-danger"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
+            <Trash2 size={ICON_SIZE} />
             Sil
-          </button>
+          </Button>
         )}
       </div>
     </li>

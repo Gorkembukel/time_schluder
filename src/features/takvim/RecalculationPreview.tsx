@@ -1,8 +1,11 @@
 import { format } from 'date-fns'
+import { AlertTriangle } from 'lucide-react'
 import type { TaskChange } from '../../lib/planning-engine'
 import type { Task } from '../../types/domain'
+import { Button } from '../../components/Button'
 
 const DATE_TIME_FORMAT = 'd MMM HH:mm'
+const ICON_SIZE = 16
 
 /** recalculate.ts / swap.ts'in "büyük değişiklik" önerisini onaya sunan panel — hiçbir şey burada otomatik uygulanmaz. */
 export function RecalculationPreview({
@@ -21,8 +24,11 @@ export function RecalculationPreview({
   const taskOf = (id: string) => tasks.find((t) => t.id === id)
 
   return (
-    <div className="rounded-lg border border-warning/60 bg-surface p-3">
-      <p className="text-sm font-medium text-text">{reason}</p>
+    <div className="rounded-lg border border-warning/60 bg-warning/5 p-3">
+      <p className="flex items-start gap-2 text-sm font-medium text-text">
+        <AlertTriangle size={ICON_SIZE} className="mt-0.5 shrink-0 text-warning" />
+        {reason}
+      </p>
       <ul className="mt-2 flex flex-col gap-1.5 text-xs">
         {changes.map((change) => {
           const original = taskOf(change.taskId)
@@ -42,20 +48,12 @@ export function RecalculationPreview({
         })}
       </ul>
       <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-text"
-        >
+        <Button variant="primary" size="sm" onClick={onConfirm}>
           Uygula
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary"
-        >
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}>
           Vazgeç
-        </button>
+        </Button>
       </div>
     </div>
   )

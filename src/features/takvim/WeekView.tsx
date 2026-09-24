@@ -34,7 +34,7 @@ export function WeekView({
               key={day.toISOString()}
               type="button"
               onClick={() => onSelectDay(day)}
-              className={`flex min-h-[7rem] flex-col gap-1 rounded-lg border p-2 text-left transition-all motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md ${
+              className={`flex min-h-[7rem] flex-col gap-1 rounded-lg border p-2 text-left shadow-sm transition-all motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md ${
                 isToday(day) ? 'border-primary' : 'border-border hover:border-primary/50'
               } bg-surface`}
             >

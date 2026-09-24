@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import { Plus } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useRequirements } from '../../hooks/useRequirements'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { createTask } from '../../services/repositories/tasksRepository'
 import { determineDetailLevel } from '../../lib/planning-engine'
+import { Button } from '../../components/Button'
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1.5 text-sm text-text'
 const DEFAULT_START_TIME = '09:00'
@@ -63,7 +65,7 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-surface p-4"
+      className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm"
     >
       <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-text-secondary">
         Başlık
@@ -139,12 +141,10 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
         </select>
       </label>
       {error && <p className="w-full text-xs text-danger">{error}</p>}
-      <button
-        type="submit"
-        className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-text"
-      >
+      <Button type="submit" variant="primary">
+        <Plus size={16} />
         Görev ekle
-      </button>
+      </Button>
     </form>
   )
 }

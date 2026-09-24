@@ -1,9 +1,11 @@
 import type { ChangeEvent, ReactNode } from 'react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
 import { updateCategoryBudget } from '../../services/repositories/financeCategoriesRepository'
 import { useUid } from '../../app/UidContext'
 import { Skeleton } from '../../components/Skeleton'
+import { PageHeader } from '../../components/PageHeader'
 import { PLANNING_SCALES, type PlanningScale, type Theme } from '../../types/domain'
 
 const LOADING_SECTION_COUNT = 3
@@ -36,7 +38,7 @@ const BUFFER_RATIO_STEP = 0.05
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-text">{title}</h2>
       <div className="mt-4 flex flex-col gap-3">{children}</div>
     </section>
@@ -82,8 +84,8 @@ export function AyarlarPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Ayarlar</h1>
+    <div className="flex flex-col gap-5">
+      <PageHeader icon={SettingsIcon} title="Ayarlar" />
 
       <Section title="Genel">
         <Field label="Dil">
