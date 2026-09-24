@@ -1,8 +1,16 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { deleteTask, updateTaskStatus } from '../../services/repositories/tasksRepository'
+import {
+  deleteTask,
+  fetchAllTasks,
+  stripDependencyReferences,
+  updateTaskStatus,
+} from '../../services/repositories/tasksRepository'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
+import { useSettingsStore } from '../../stores/settingsStore'
+import { recalculateFromDeletion } from '../../lib/planning-engine'
 import { TASK_STATUSES, type Task, type TaskStatus } from '../../types/domain'
+import { TaskEditor } from './TaskEditor'
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   planned: 'Planlandı',
@@ -15,7 +23,37 @@ const TIME_FORMAT = 'HH:mm'
 
 export function TaskRow({ uid, task }: { uid: string; task: Task }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [deleteNote, setDeleteNote] = useState<string | null>(null)
   const areaName = useLifeAreasStore((s) => s.areas.find((a) => a.id === task.lifeAreaId)?.name)
+  const majorChangeThreshold = useSettingsStore(
+    (s) => s.settings.planningEngine.majorChangeThreshold,
+  )
+
+  async function handleDelete() {
+    const allTasks = await fetchAllTasks(uid)
+    const { affectedTaskIds } = recalculateFromDeletion(allTasks, task.id, majorChangeThreshold)
+    await deleteTask(uid, task.id)
+    if (affectedTaskIds.length > 0) {
+      const cleaned = await stripDependencyReferences(uid, allTasks, task.id)
+      setDeleteNote(
+        `Silindi. ${cleaned.length} görevin bu göreve olan bağımlılığı da kaldırıldı.`,
+      )
+    }
+  }
+
+  if (editing) {
+    return (
+      <li className="py-2.5">
+        <TaskEditor
+          uid={uid}
+          task={task}
+          onDone={() => setEditing(false)}
+          onCancel={() => setEditing(false)}
+        />
+      </li>
+    )
+  }
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
@@ -25,6 +63,10 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
           {task.title}
         </p>
         {areaName && <p className="text-xs text-text-secondary">{areaName}</p>}
+        {task.dependencies.length > 0 && (
+          <p className="text-xs text-text-secondary">🔗 {task.dependencies.length} bağımlılık</p>
+        )}
+        {deleteNote && <p className="text-xs text-warning">{deleteNote}</p>}
       </div>
       <div className="flex items-center gap-2">
         <select
@@ -38,13 +80,16 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-xs text-text-secondary hover:text-text"
+        >
+          Düzenle
+        </button>
         {confirmingDelete ? (
           <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => void deleteTask(uid, task.id)}
-              className="font-medium text-danger"
-            >
+            <button type="button" onClick={() => void handleDelete()} className="font-medium text-danger">
               Sil
             </button>
             <button
