@@ -54,6 +54,7 @@ export interface NewTaskInput {
   scale: PlanningScale
   startAt: string
   endAt: string
+  parentTaskId?: string
   lifeAreaId?: string
   requirementId?: string
   bufferMinutes: number

@@ -6,18 +6,9 @@ import { updateCategoryBudget } from '../../services/repositories/financeCategor
 import { useUid } from '../../app/UidContext'
 import { Skeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/PageHeader'
-import { PLANNING_SCALES, type PlanningScale, type Theme } from '../../types/domain'
+import { PLANNING_SCALES, PLANNING_SCALE_LABELS, type Theme } from '../../types/domain'
 
 const LOADING_SECTION_COUNT = 3
-
-const SCALE_LABELS: Record<PlanningScale, string> = {
-  year3: '3 Yıl',
-  year: 'Yıl',
-  month: 'Ay',
-  week: 'Hafta',
-  day: 'Gün',
-  hour: 'Saat',
-}
 
 const WEEKDAY_LABELS = [
   { value: 1, label: 'Pazartesi' },
@@ -161,7 +152,7 @@ export function AyarlarPage() {
 
       <Section title="Planlama Motoru">
         {PLANNING_SCALES.map((scale) => (
-          <Field key={scale} label={`Detaylandırma penceresi — ${SCALE_LABELS[scale]} (gün)`}>
+          <Field key={scale} label={`Detaylandırma penceresi — ${PLANNING_SCALE_LABELS[scale]} (gün)`}>
             <input
               type="number"
               min={DETAIL_WINDOW_MIN}

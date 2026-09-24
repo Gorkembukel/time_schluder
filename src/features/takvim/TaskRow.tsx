@@ -10,16 +10,9 @@ import {
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { recalculateFromDeletion } from '../../lib/planning-engine'
-import { TASK_STATUSES, type Task, type TaskStatus } from '../../types/domain'
+import { TASK_STATUSES, TASK_STATUS_LABELS, type Task, type TaskStatus } from '../../types/domain'
 import { TaskEditor } from './TaskEditor'
 import { Button } from '../../components/Button'
-
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  planned: 'Planlandı',
-  'in-progress': 'Devam ediyor',
-  done: 'Tamamlandı',
-  delayed: 'Gecikti',
-}
 
 const TIME_FORMAT = 'HH:mm'
 const ICON_SIZE = 14
@@ -87,7 +80,7 @@ export function TaskRow({ uid, task }: { uid: string; task: Task }) {
         >
           {TASK_STATUSES.map((status) => (
             <option key={status} value={status}>
-              {STATUS_LABELS[status]}
+              {TASK_STATUS_LABELS[status]}
             </option>
           ))}
         </select>

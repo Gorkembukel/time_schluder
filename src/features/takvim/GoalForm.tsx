@@ -1,68 +1,73 @@
 import { useState, type FormEvent } from 'react'
+import { endOfDay, startOfDay } from 'date-fns'
 import { Plus } from 'lucide-react'
-import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
-import { useRequirements } from '../../hooks/useRequirements'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { createTask } from '../../services/repositories/tasksRepository'
 import { determineDetailLevel } from '../../lib/planning-engine'
 import { toDateInputValue } from '../../lib/dateInput'
+import { PLANNING_SCALE_LABELS, type PlanningScale } from '../../types/domain'
 import { Button } from '../../components/Button'
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1.5 text-sm text-text'
-const DEFAULT_START_TIME = '09:00'
-const DEFAULT_END_TIME = '10:00'
 
-export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCreated: () => void }) {
-  const uid = useUid()
+/** `defaultRange` her iki uçta da dahildir (kapsayıcı) — çağıran taraf dışlayıcı aralıkları (`scalePeriodRange`) buraya vermeden önce kendi çevirir. */
+export function GoalForm({
+  uid,
+  scale,
+  parentTaskId,
+  defaultLifeAreaId,
+  defaultRange,
+  onDone,
+}: {
+  uid: string
+  scale: PlanningScale
+  parentTaskId?: string
+  defaultLifeAreaId?: string
+  defaultRange: { start: Date; end: Date }
+  onDone: () => void
+}) {
   const areas = useLifeAreasStore((s) => s.areas)
   const detailWindowDays = useSettingsStore((s) => s.settings.planningEngine.detailWindowDays)
 
   const [title, setTitle] = useState('')
-  const [date, setDate] = useState(toDateInputValue(defaultDate))
-  const [startTime, setStartTime] = useState(DEFAULT_START_TIME)
-  const [endTime, setEndTime] = useState(DEFAULT_END_TIME)
-  const [lifeAreaId, setLifeAreaId] = useState('')
-  const [requirementId, setRequirementId] = useState('')
+  const [startDate, setStartDate] = useState(toDateInputValue(defaultRange.start))
+  const [endDate, setEndDate] = useState(toDateInputValue(defaultRange.end))
+  const [lifeAreaId, setLifeAreaId] = useState(defaultLifeAreaId ?? '')
   const [error, setError] = useState<string | null>(null)
-
-  const { requirements } = useRequirements(uid, lifeAreaId)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    const startAt = new Date(`${date}T${startTime}:00`)
-    const endAt = new Date(`${date}T${endTime}:00`)
+    const startAt = startOfDay(new Date(startDate))
+    const endAt = endOfDay(new Date(endDate))
 
     if (!title.trim()) return
     if (endAt <= startAt) {
-      setError('Bitiş saati başlangıçtan sonra olmalı.')
+      setError('Bitiş tarihi başlangıçtan sonra olmalı.')
       return
     }
 
     await createTask(uid, {
       title: title.trim(),
-      scale: 'hour',
+      scale,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
+      parentTaskId,
       lifeAreaId: lifeAreaId || undefined,
-      requirementId: requirementId || undefined,
       bufferMinutes: 0,
-      detailLevel: determineDetailLevel('hour', startAt, new Date(), detailWindowDays),
+      detailLevel: determineDetailLevel(scale, startAt, new Date(), detailWindowDays),
     })
-
-    setTitle('')
-    setRequirementId('')
-    onCreated()
+    onDone()
   }
 
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm"
+      className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surface p-3"
     >
       <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-text-secondary">
-        Başlık
+        {PLANNING_SCALE_LABELS[scale]} başlığı
         <input
           required
           value={title}
@@ -71,32 +76,22 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-text-secondary">
-        Tarih
+        Başlangıç
         <input
           type="date"
           required
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className={inputClass}
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-text-secondary">
-        Başlangıç
-        <input
-          type="time"
-          required
-          value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
           className={inputClass}
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-text-secondary">
         Bitiş
         <input
-          type="time"
+          type="date"
           required
-          value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
           className={inputClass}
         />
       </label>
@@ -104,10 +99,7 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
         Hayat alanı
         <select
           value={lifeAreaId}
-          onChange={(e) => {
-            setLifeAreaId(e.target.value)
-            setRequirementId('')
-          }}
+          onChange={(e) => setLifeAreaId(e.target.value)}
           className={inputClass}
         >
           <option value="">—</option>
@@ -118,26 +110,13 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-1 text-xs text-text-secondary">
-        Gereklilik
-        <select
-          value={requirementId}
-          onChange={(e) => setRequirementId(e.target.value)}
-          disabled={!lifeAreaId}
-          className={inputClass}
-        >
-          <option value="">—</option>
-          {requirements.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </label>
       {error && <p className="w-full text-xs text-danger">{error}</p>}
-      <Button type="submit" variant="primary">
-        <Plus size={16} />
-        Görev ekle
+      <Button type="submit" variant="primary" size="sm">
+        <Plus size={14} />
+        Ekle
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onDone}>
+        Vazgeç
       </Button>
     </form>
   )

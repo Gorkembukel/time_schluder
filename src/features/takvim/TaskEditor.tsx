@@ -7,6 +7,7 @@ import {
 } from '../../services/repositories/tasksRepository'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { recalculateFromChange, type RecalculationProposal } from '../../lib/planning-engine'
+import { toDateInputValue } from '../../lib/dateInput'
 import { RecalculationPreview } from './RecalculationPreview'
 import { DEPENDENCY_TYPES, type DependencyType, type Task, type TaskDependency } from '../../types/domain'
 import { Button } from '../../components/Button'
@@ -14,13 +15,6 @@ import { Button } from '../../components/Button'
 const ICON_SIZE = 14
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text'
-
-function toDateInputValue(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 function toTimeInputValue(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`

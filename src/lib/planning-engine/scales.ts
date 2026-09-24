@@ -2,7 +2,7 @@ import { addHours, addYears, startOfHour, startOfYear } from 'date-fns'
 import { dayRange, monthRange, weekRange, type DateRange } from '../dateRange'
 import { PLANNING_SCALES, type PlanningScale } from '../../types/domain'
 
-const YEAR3_SPAN_YEARS = 3
+export const YEAR3_SPAN_YEARS = 3
 
 export function yearRange(date: Date): DateRange {
   const start = startOfYear(date)

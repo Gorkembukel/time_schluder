@@ -1,6 +1,15 @@
 export const PLANNING_SCALES = ['year3', 'year', 'month', 'week', 'day', 'hour'] as const
 export type PlanningScale = (typeof PLANNING_SCALES)[number]
 
+export const PLANNING_SCALE_LABELS: Record<PlanningScale, string> = {
+  year3: '3 Yıl',
+  year: 'Yıl',
+  month: 'Ay',
+  week: 'Hafta',
+  day: 'Gün',
+  hour: 'Saat',
+}
+
 export const REQUIREMENT_TYPES = [
   'bilgi',
   'beceri',
@@ -67,6 +76,13 @@ export type DetailLevel = 'detailed' | 'rough'
 
 export const TASK_STATUSES = ['planned', 'in-progress', 'done', 'delayed'] as const
 export type TaskStatus = (typeof TASK_STATUSES)[number]
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  planned: 'Planlandı',
+  'in-progress': 'Devam ediyor',
+  done: 'Tamamlandı',
+  delayed: 'Gecikti',
+}
 
 export interface Task {
   id: string
