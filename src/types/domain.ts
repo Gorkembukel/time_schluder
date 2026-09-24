@@ -14,6 +14,18 @@ export const REQUIREMENT_TYPES = [
 ] as const
 export type RequirementType = (typeof REQUIREMENT_TYPES)[number]
 
+export const REQUIREMENT_TYPE_LABELS: Record<RequirementType, string> = {
+  bilgi: 'Bilgi',
+  beceri: 'Beceri',
+  'iliski-ag': 'İlişki/Ağ',
+  'finansal-kaynak': 'Finansal Kaynak',
+  'varlik-arac': 'Varlık/Araç',
+  'belge-yetkinlik': 'Belge/Yetkinlik',
+  aliskanlik: 'Alışkanlık',
+  'saglik-enerji': 'Sağlık/Enerji',
+  deneyim: 'Deneyim',
+}
+
 export const DEPENDENCY_TYPES = ['FS', 'SS', 'FF', 'SF'] as const
 export type DependencyType = (typeof DEPENDENCY_TYPES)[number]
 

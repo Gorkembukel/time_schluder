@@ -29,6 +29,16 @@ vi.mock('../services/repositories/financeCategoriesRepository', () => ({
   },
 }))
 
+vi.mock('../services/repositories/lifeAreasRepository', () => ({
+  subscribeLifeAreas: (_uid: string, onChange: (areas: unknown[]) => void) => {
+    onChange([])
+    return () => {}
+  },
+  createLifeArea: vi.fn(),
+  renameLifeArea: vi.fn(),
+  deleteLifeArea: vi.fn(),
+}))
+
 function renderApp() {
   return render(
     <HashRouter>
