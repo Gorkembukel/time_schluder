@@ -32,5 +32,13 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Test dosyalarındaki sabit değerler (süreler, beklenen sonuçlar) fixture'lardır,
+    // kullanıcı ayarına taşınması gereken hardcode değildir.
+    files: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-magic-numbers': 'off',
+    },
+  },
   prettier,
 )
