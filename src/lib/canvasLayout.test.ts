@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  boundingRange,
   dependencyEdgeSides,
   inferDependencyType,
   layoutNodes,
-  subPeriodBoundaries,
+  panView,
   timeRatio,
+  zoomView,
 } from './canvasLayout'
 import type { DependencyType, Task } from '../types/domain'
 
@@ -59,15 +61,56 @@ describe('layoutNodes', () => {
   })
 })
 
-describe('subPeriodBoundaries', () => {
-  it('yıl periyodunu ay sınırlarına böler (12 sınır)', () => {
-    const boundaries = subPeriodBoundaries('year', PERIOD, 1)
-    expect(boundaries).toHaveLength(12)
-    expect(boundaries[0].toISOString()).toBe(PERIOD.start.toISOString())
+describe('boundingRange', () => {
+  it('boş listede null döner', () => {
+    expect(boundingRange([])).toBeNull()
   })
 
-  it('en ince ölçekte (saat) boş liste döner', () => {
-    expect(subPeriodBoundaries('hour', PERIOD, 1)).toEqual([])
+  it('en erken başlangıç ile en geç bitişi kapsar', () => {
+    const tasks = [
+      task('a', new Date(2026, 2, 1).toISOString(), new Date(2026, 3, 1).toISOString()),
+      task('b', new Date(2026, 0, 1).toISOString(), new Date(2026, 1, 1).toISOString()),
+    ]
+    const range = boundingRange(tasks)
+    expect(range?.start.getTime()).toBe(new Date(2026, 0, 1).getTime())
+    expect(range?.end.getTime()).toBe(new Date(2026, 3, 1).getTime())
+  })
+})
+
+describe('zoomView / panView', () => {
+  const bounds = PERIOD
+
+  it('zoomView imlecin altındaki anı sabit tutarak yakınlaştırır', () => {
+    const view = { start: new Date(2026, 0, 1), end: new Date(2027, 0, 1) }
+    const cursorRatio = 0.5
+    const zoomed = zoomView(view, cursorRatio, 0.5, 1000, bounds)
+    const zoomedDuration = zoomed.end.getTime() - zoomed.start.getTime()
+    const originalDuration = view.end.getTime() - view.start.getTime()
+    expect(zoomedDuration).toBeCloseTo(originalDuration * 0.5, -3)
+  })
+
+  it('zoomView süreyi minDurationMs altına düşürmez', () => {
+    const view = { start: new Date(2026, 0, 1), end: new Date(2026, 0, 2) }
+    const oneHourMs = 60 * 60 * 1000
+    const zoomed = zoomView(view, 0.5, 0.001, oneHourMs, bounds)
+    expect(zoomed.end.getTime() - zoomed.start.getTime()).toBe(oneHourMs)
+  })
+
+  it('zoomView sınırları (bounds) aşıp büyümez', () => {
+    const view = { start: new Date(2026, 5, 1), end: new Date(2026, 6, 1) }
+    const zoomed = zoomView(view, 0.5, 100, 1000, bounds)
+    expect(zoomed.start.getTime()).toBeGreaterThanOrEqual(bounds.start.getTime())
+    expect(zoomed.end.getTime()).toBeLessThanOrEqual(bounds.end.getTime())
+  })
+
+  it('panView aralığı kaydırır ama bounds dışına taşırmaz', () => {
+    const view = { start: new Date(2026, 0, 1), end: new Date(2026, 1, 1) }
+    const oneDayMs = 24 * 60 * 60 * 1000
+    const panned = panView(view, -oneDayMs, bounds)
+    expect(panned.start.getTime()).toBe(bounds.start.getTime())
+
+    const pannedForward = panView(view, 400 * oneDayMs, bounds)
+    expect(pannedForward.end.getTime()).toBe(bounds.end.getTime())
   })
 })
 

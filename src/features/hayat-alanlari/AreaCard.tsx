@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ChevronRight, Layers, Plus, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronRight, Layers, Plus, Trash2, Waypoints } from 'lucide-react'
 import {
   deleteLifeArea,
   renameLifeArea,
@@ -37,6 +38,7 @@ const ICON_SIZE = 14
 const DEPTH_INDENT_REM = 0.5
 
 export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
+  const navigate = useNavigate()
   const { requirements, loading } = useRequirements(uid, area.id)
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(area.name)
@@ -100,6 +102,10 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
             ))}
           </select>
         </label>
+        <Button variant="secondary" size="sm" onClick={() => navigate(`/kanvas/${area.id}`)}>
+          <Waypoints size={ICON_SIZE} />
+          Kanvasta Planla
+        </Button>
         {confirmingDelete ? (
           <div className="flex items-center gap-1 text-xs">
             <span className="text-text-secondary">Emin misin?</span>

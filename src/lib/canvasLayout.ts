@@ -1,11 +1,11 @@
 import type { DateRange } from './dateRange'
-import { finerScale, scalePeriodRange } from './planning-engine'
-import type { DependencyType, PlanningScale, Task } from '../types/domain'
+import type { DependencyType, Task } from '../types/domain'
 
 /**
- * Görsel Planlama Kanvası'nın saf (side-effect'siz) yerleşim hesapları: zaman → yatay konum,
- * çakışan kutucuklar için lane (satır) ataması, ve sürükle-bağla bırakma noktasından
- * FS/SS/FF/SF türü çıkarımı. Bkz. `PlanningCanvas.tsx`.
+ * Görsel Planlama Kanvası'nın saf (side-effect'siz) yerleşim hesapları: tek, sürekli bir zaman
+ * ekseninde (harita zoom'u gibi) yatay konum, çakışan kutucuklar için lane (satır) ataması,
+ * zoom/pan sınırlama, ve sürükle-bağla bırakma noktasından FS/SS/FF/SF türü çıkarımı.
+ * Bkz. `features/kanvas/PlanningCanvas.tsx`.
  */
 
 /** Bir tarihin, verilen periyot içindeki 0..1 aralığındaki oransal konumu. Periyot dışına taşarsa kırpılır. */
@@ -58,26 +58,50 @@ export function layoutNodes(tasks: Task[], period: DateRange): CanvasNode[] {
   return nodes
 }
 
-/** Bir ölçek bandının içindeki bir alt seviye sınırlarının (dashed çizgiler için) zaman listesi. */
-export function subPeriodBoundaries(
-  scale: PlanningScale,
-  period: DateRange,
-  weekStartsOn: number,
-): Date[] {
-  const finer = finerScale(scale)
-  if (!finer) return []
-  const boundaries: Date[] = []
-  let cursor = period.start
-  let guard = 0
-  const GUARD_LIMIT = 1000
-  while (cursor < period.end && guard < GUARD_LIMIT) {
-    const sub = scalePeriodRange(finer, cursor, weekStartsOn)
-    boundaries.push(sub.start)
-    if (sub.end <= cursor) break
-    cursor = sub.end
-    guard += 1
+/** Verilen işlerin en erken başlangıcı ile en geç bitişini kapsayan aralık — kanvasın "dünyası". */
+export function boundingRange(tasks: Task[]): DateRange | null {
+  if (tasks.length === 0) return null
+  let start = new Date(tasks[0].startAt)
+  let end = new Date(tasks[0].endAt)
+  for (const t of tasks) {
+    const s = new Date(t.startAt)
+    const e = new Date(t.endAt)
+    if (s < start) start = s
+    if (e > end) end = e
   }
-  return boundaries
+  return { start, end }
+}
+
+/**
+ * Harita tarzı zoom: imlecin altındaki an sabit kalacak şekilde görünür aralığın süresini
+ * `factor` ile çarpar (1'den küçük = yakınlaş/zoom in, büyük = uzaklaş/zoom out). Süre
+ * `minDurationMs`–`bounds` süresi arasında, aralık da `bounds` içinde kalacak şekilde kırpılır.
+ */
+export function zoomView(
+  view: DateRange,
+  cursorRatio: number,
+  factor: number,
+  minDurationMs: number,
+  bounds: DateRange,
+): DateRange {
+  const boundsMs = bounds.end.getTime() - bounds.start.getTime()
+  const cursorMs = view.start.getTime() + cursorRatio * (view.end.getTime() - view.start.getTime())
+  const currentMs = view.end.getTime() - view.start.getTime()
+  const nextMs = Math.min(Math.max(currentMs * factor, minDurationMs), boundsMs)
+  let startMs = cursorMs - cursorRatio * nextMs
+  startMs = Math.min(Math.max(startMs, bounds.start.getTime()), bounds.end.getTime() - nextMs)
+  return { start: new Date(startMs), end: new Date(startMs + nextMs) }
+}
+
+/** Görünür aralığı `deltaMs` kadar kaydırır (pan), `bounds` dışına taşmayacak şekilde kırpılır. */
+export function panView(view: DateRange, deltaMs: number, bounds: DateRange): DateRange {
+  const durationMs = view.end.getTime() - view.start.getTime()
+  const maxStartMs = bounds.end.getTime() - durationMs
+  const startMs = Math.min(
+    Math.max(view.start.getTime() + deltaMs, bounds.start.getTime()),
+    Math.max(maxStartMs, bounds.start.getTime()),
+  )
+  return { start: new Date(startMs), end: new Date(startMs + durationMs) }
 }
 
 export type EdgeSide = 'start' | 'end'
