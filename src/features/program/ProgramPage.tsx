@@ -30,7 +30,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { Button } from '../../components/Button'
 import type { Task } from '../../types/domain'
 import { WeekGrid } from './WeekGrid'
-import { PoolPanel } from './PoolPanel'
+import { PoolPanel, type PendingQuickTask } from './PoolPanel'
 import { RoutinesPanel } from './RoutinesPanel'
 import { AutoPlanPreview } from './AutoPlanPreview'
 
@@ -55,6 +55,8 @@ export function ProgramPage() {
   const [plan, setPlan] = useState<AutoPlan | null>(null)
   const [applying, setApplying] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'info' | 'warning'; text: string } | null>(null)
+  /** Havuzda henüz zamanlanmamış, tek seferlik görev taslakları — yalnızca bu sayfanın ömrü boyunca yaşar. */
+  const [pendingQuickTasks, setPendingQuickTasks] = useState<PendingQuickTask[]>([])
 
   const week = weekRange(referenceDate, weekStartsOn)
   const weekStartMs = week.start.getTime()
@@ -110,6 +112,34 @@ export function ProgramPage() {
       bufferMinutes: 0,
       detailLevel: 'detailed',
     })
+  }
+
+  /** Hiyerarşiye bağlı olmayan, tek seferlik bir görevi doğrudan ızgaraya (verilen saate) yerleştirir. */
+  async function createQuickTask(start: Date, title: string, minutes: number, lifeAreaId?: string) {
+    await createTask(uid, {
+      title,
+      scale: 'hour',
+      startAt: start.toISOString(),
+      endAt: addMinutes(start, minutes).toISOString(),
+      lifeAreaId,
+      bufferMinutes: 0,
+      detailLevel: 'detailed',
+    })
+  }
+
+  function addQuickTask(title: string, lifeAreaId?: string) {
+    setPendingQuickTasks((list) => [...list, { id: newTaskId(uid), title, lifeAreaId }])
+  }
+
+  function removeQuickTask(id: string) {
+    setPendingQuickTasks((list) => list.filter((t) => t.id !== id))
+  }
+
+  async function placeQuickTask(quickId: string, start: Date) {
+    const item = pendingQuickTasks.find((t) => t.id === quickId)
+    if (!item) return
+    await createQuickTask(start, item.title, blockMinutes, item.lifeAreaId)
+    removeQuickTask(quickId)
   }
 
   function handleAutoPlace(goal: Task) {
@@ -239,6 +269,10 @@ export function ProgramPage() {
           index={index}
           scheduledMinutes={(id) => scheduledMinutesFor(id, tasks, week)}
           onAutoPlace={handleAutoPlace}
+          areas={areas}
+          pendingQuickTasks={pendingQuickTasks}
+          onAddQuickTask={addQuickTask}
+          onRemoveQuickTask={removeQuickTask}
         />
         <WeekGrid
           week={week}
@@ -248,6 +282,12 @@ export function ProgramPage() {
           routines={occurrences}
           ghostBlocks={plan?.blocks ?? []}
           titleOf={titleOf}
+          areas={areas}
+          defaultDurationMinutes={blockMinutes}
+          onQuickAdd={(start, title, minutes, lifeAreaId) =>
+            void createQuickTask(start, title, minutes, lifeAreaId)
+          }
+          onDropQuickPending={(quickId, start) => void placeQuickTask(quickId, start)}
           onDropPool={(goalId, start) => {
             const goal = index.get(goalId)
             if (goal) void placeBlock(goal, start, blockMinutes)

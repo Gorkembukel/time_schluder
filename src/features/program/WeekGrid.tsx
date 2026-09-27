@@ -1,12 +1,21 @@
-import { useState, type DragEvent, type PointerEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react'
 import { addDays, addMinutes, differenceInMinutes, format, isSameDay, isToday } from 'date-fns'
 import { tr } from 'date-fns/locale'
-import { Check, Trash2 } from 'lucide-react'
+import { Check, Plus, Trash2, X } from 'lucide-react'
 import type { DateRange } from '../../lib/dateRange'
 import { SLOT_ALIGN_MINUTES, type RoutineOccurrence } from '../../lib/autoPlanner'
-import type { Task } from '../../types/domain'
+import type { LifeArea, Task } from '../../types/domain'
 
 export const POOL_DRAG_MIME = 'application/x-time-schluder-pool'
+export const QUICK_DRAG_MIME = 'application/x-time-schluder-quick'
 const BLOCK_DRAG_MIME = 'application/x-time-schluder-block'
 
 /** Izgarada bir saatin piksel yüksekliği — blok yüksekliği süresiyle orantılıdır. */
@@ -30,11 +39,18 @@ interface GridProps {
   /** Otomatik plan önizlemesi — kesikli çerçeveyle çizilir. */
   ghostBlocks: Task[]
   titleOf: (block: Task) => string
+  areas: LifeArea[]
+  /** Boş bir hücreye tıklayınca açılan hızlı ekleme formunun varsayılan süresi (dk). */
+  defaultDurationMinutes: number
   onDropPool: (goalId: string, start: Date) => void
   onMoveBlock: (block: Task, start: Date) => void
   onResizeBlock: (block: Task, end: Date) => void
   onToggleDone: (block: Task) => void
   onDelete: (block: Task) => void
+  /** Boş bir hücreye tıklayarak tek seferlik görev eklendiğinde. */
+  onQuickAdd: (start: Date, title: string, minutes: number, lifeAreaId?: string) => void
+  /** Havuzdaki bekleyen tek seferlik görev ızgaraya bırakıldığında. */
+  onDropQuickPending: (quickId: string, start: Date) => void
 }
 
 export function WeekGrid(props: GridProps) {
@@ -85,13 +101,18 @@ function DayColumn({
   routines,
   ghostBlocks,
   titleOf,
+  areas,
+  defaultDurationMinutes,
   onDropPool,
   onMoveBlock,
   onResizeBlock,
   onToggleDone,
   onDelete,
+  onQuickAdd,
+  onDropQuickPending,
 }: GridProps & { day: Date; height: number }) {
   const [dragOver, setDragOver] = useState(false)
+  const [addingAtMinutes, setAddingAtMinutes] = useState<number | null>(null)
   const dayOrigin = new Date(day)
   dayOrigin.setHours(dayStartHour, 0, 0, 0)
 
@@ -108,6 +129,11 @@ function DayColumn({
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault()
     setDragOver(false)
+    const quickId = e.dataTransfer.getData(QUICK_DRAG_MIME)
+    if (quickId) {
+      onDropQuickPending(quickId, addMinutes(dayOrigin, minutesAt(e.clientY, e.currentTarget)))
+      return
+    }
     const poolGoalId = e.dataTransfer.getData(POOL_DRAG_MIME)
     if (poolGoalId) {
       onDropPool(poolGoalId, addMinutes(dayOrigin, minutesAt(e.clientY, e.currentTarget)))
@@ -122,6 +148,15 @@ function DayColumn({
     onMoveBlock(block, addMinutes(dayOrigin, minutes))
   }
 
+  /**
+   * Boş bir zamana tıklayınca hızlı ekleme formunu aç. Bloklar/rutinler bu düğmenin üzerinde
+   * (sonradan render edildiği için) durur ve tıklamayı kendileri yakalar. Klavyeyle (Enter/Boşluk)
+   * tetiklenirse tarayıcı `clientY`'yi düğmenin merkezine ayarlar — günün ortası makul bir varsayılan.
+   */
+  function handleCellClick(e: MouseEvent<HTMLButtonElement>) {
+    setAddingAtMinutes(minutesAt(e.clientY, e.currentTarget))
+  }
+
   const dayBlocks = blocks.filter((b) => isSameDay(new Date(b.startAt), day))
   const dayGhosts = ghostBlocks.filter((b) => isSameDay(new Date(b.startAt), day))
   const dayRoutines = routines.filter((r) => isSameDay(r.start, day))
@@ -133,7 +168,8 @@ function DayColumn({
       onDragOver={(e) => {
         if (
           e.dataTransfer.types.includes(POOL_DRAG_MIME) ||
-          e.dataTransfer.types.includes(BLOCK_DRAG_MIME)
+          e.dataTransfer.types.includes(BLOCK_DRAG_MIME) ||
+          e.dataTransfer.types.includes(QUICK_DRAG_MIME)
         ) {
           e.preventDefault()
           setDragOver(true)
@@ -147,6 +183,13 @@ function DayColumn({
         backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_ROW_PX - 1}px, var(--color-border) ${HOUR_ROW_PX - 1}px, var(--color-border) ${HOUR_ROW_PX}px)`,
       }}
     >
+      <button
+        type="button"
+        onClick={handleCellClick}
+        aria-label={`${format(day, 'EEEE d MMMM', { locale: tr })}: boş bir zamana tek seferlik görev ekle`}
+        className="absolute inset-0 cursor-cell focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+      />
+
       {dayRoutines.map((r) => (
         <div
           key={`${r.routine.id}-${r.start.toISOString()}`}
@@ -191,7 +234,111 @@ function DayColumn({
           onDelete={onDelete}
         />
       ))}
+
+      {addingAtMinutes !== null && (
+        <QuickAddForm
+          top={(addingAtMinutes / MINUTES_PER_HOUR) * HOUR_ROW_PX}
+          areas={areas}
+          defaultDurationMinutes={defaultDurationMinutes}
+          onCancel={() => setAddingAtMinutes(null)}
+          onSubmit={(title, minutes, lifeAreaId) => {
+            onQuickAdd(addMinutes(dayOrigin, addingAtMinutes), title, minutes, lifeAreaId)
+            setAddingAtMinutes(null)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/** Boş bir hücreye tıklayınca açılan, tek seferlik görev için hızlı ekleme formu. */
+function QuickAddForm({
+  top,
+  areas,
+  defaultDurationMinutes,
+  onSubmit,
+  onCancel,
+}: {
+  top: number
+  areas: LifeArea[]
+  defaultDurationMinutes: number
+  onSubmit: (title: string, minutes: number, lifeAreaId?: string) => void
+  onCancel: () => void
+}) {
+  const [title, setTitle] = useState('')
+  const [minutes, setMinutes] = useState(String(defaultDurationMinutes))
+  const [lifeAreaId, setLifeAreaId] = useState('')
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    titleInputRef.current?.focus()
+  }, [])
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = title.trim()
+    if (!trimmed) return
+    onSubmit(trimmed, Number(minutes) || defaultDurationMinutes, lifeAreaId || undefined)
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      role="dialog"
+      aria-label="Tek seferlik görev ekle"
+      className="absolute inset-x-0.5 z-10 flex flex-col gap-1 rounded-md border border-primary/60 bg-surface p-1.5 text-xs shadow-md"
+      style={{ top }}
+    >
+      <input
+        ref={titleInputRef}
+        required
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Görev başlığı"
+        className="rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+      />
+      <div className="flex gap-1">
+        <input
+          type="number"
+          min={SLOT_ALIGN_MINUTES}
+          step={SLOT_ALIGN_MINUTES}
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          aria-label="Süre (dk)"
+          className="w-16 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+        />
+        <select
+          value={lifeAreaId}
+          onChange={(e) => setLifeAreaId(e.target.value)}
+          aria-label="Hayat alanı (opsiyonel)"
+          className="flex-1 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+        >
+          <option value="">— hayat alanı yok —</option>
+          {areas.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex justify-end gap-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Vazgeç"
+          className="rounded p-1 text-text-secondary hover:bg-border/60"
+        >
+          <X size={ICON_SIZE} />
+        </button>
+        <button
+          type="submit"
+          aria-label="Görevi ekle"
+          className="rounded p-1 text-primary hover:bg-primary/10"
+        >
+          <Plus size={ICON_SIZE} />
+        </button>
+      </div>
+    </form>
   )
 }
 
