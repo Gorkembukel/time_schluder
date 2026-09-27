@@ -61,6 +61,8 @@ export interface LifeArea {
   name: string
   order: number
   priority?: LifeAreaPriority
+  /** Görsel Planlama Kanvası'nda bu alanın işlerinin köşegenin bir yarısında gösterilen rengi (hex). */
+  color?: string
   createdAt: string
   updatedAt: string
 }
@@ -73,6 +75,8 @@ export interface Requirement {
   targetMetric: number
   currentValue: number
   unit: string
+  /** Üst gereklilik (aynı hayat alanı içinde) — ör. "Robotik" altında "ROS bilgisi", "Arduino kiti". */
+  parentRequirementId?: string
   createdAt: string
   updatedAt: string
 }
@@ -100,6 +104,10 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 
 export const OVERDUE_LABEL = 'Gecikti'
 
+/** Süreli bir "görev" mi, yoksa süresiz, ilerlemeyi işaretleyen bir "kilometre taşı" mı. */
+export const TASK_KINDS = ['task', 'milestone'] as const
+export type TaskKind = (typeof TASK_KINDS)[number]
+
 export interface Task {
   id: string
   title: string
@@ -117,6 +125,55 @@ export interface Task {
   actualMinutes?: number
   /** Tamamlandı'ya geçtiği an (oyunlaştırma: seri ve zamanında bitirme bonusu için). */
   completedAt?: string
+  /** Görsel Planlama Kanvası'nda köşegenin ikinci yarısında gösterilen, kullanıcının seçtiği renk (hex). */
+  accentColor?: string
+  /** Opsiyonel — belirtilmezse 'task'. Kilometre taşları süresiz kabul edilir, kanvasta baklava dilimi olarak gösterilir. */
+  kind?: TaskKind
+  /** Görsel Planlama Kanvası'ndaki serbest dikey konum (piksel) — yatay konum tarihten türetilir. */
+  canvasY?: number
+}
+
+/** Görsel Planlama Kanvası'nda henüz bir tarihe kilitlenmemiş, kanvasta serbest bir piksel konumunda duran taslak iş. */
+export interface CanvasDraftNode {
+  id: string
+  title: string
+  hours: number
+  x: number
+  y: number
+  accentColor?: string
+  /** Opsiyonel — belirtilmezse 'task'. */
+  kind?: TaskKind
+}
+
+/** Havuzdaki (henüz kanvasa hiç yerleştirilmemiş) taslak iş — yalnızca isim ve süre taşır. */
+export interface CanvasDraftPoolItem {
+  id: string
+  title: string
+  hours: number
+  accentColor?: string
+  /** Opsiyonel — belirtilmezse 'task'. */
+  kind?: TaskKind
+}
+
+/**
+ * Taslak bir bağlantı. `fromId`/`toId` ya bir taslak düğüm id'sine ya da (biri kilitlenip gerçek
+ * bir işe dönüştüyse) gerçek bir Task id'sine işaret edebilir — bkz. `canvasDraftsRepository.ts`.
+ */
+export interface CanvasDraftEdge {
+  fromId: string
+  toId: string
+  fromSide: 'left' | 'right'
+  toSide: 'left' | 'right'
+}
+
+/**
+ * Bir hayat alanının kökü ya da bir işin alt-kanvası için tek taslak belgesi — Görsel Planlama
+ * Kanvası'nda henüz kilitlenmemiş (gerçek bir Task'a dönüşmemiş) her şeyi tutar.
+ */
+export interface CanvasDraft {
+  pool: CanvasDraftPoolItem[]
+  nodes: CanvasDraftNode[]
+  edges: CanvasDraftEdge[]
 }
 
 /**

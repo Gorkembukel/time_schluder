@@ -48,6 +48,22 @@ export interface Settings {
     /** Genel Bakış'taki "yaklaşan görevler" listesinin kaç gün ileriyi kapsayacağı. */
     upcomingWindowDays: number
   }
+  canvas: {
+    /** Görsel Planlama Kanvası'nda bağlantı kurulunca ses çalınsın mı. */
+    soundEnabled: boolean
+    /**
+     * Bir görev kutucuğunun yatayda kapladığı süreye göre hangi ölçeğe (3 yıl/yıl/ay/hafta/gün/saat)
+     * yuvarlanacağını belirleyen eşikler — kutucuğu sürükleyip boyutlandırdıkça bu eşiklere göre
+     * ölçek etiketi canlı güncellenir.
+     */
+    scaleThresholds: {
+      year3Days: number
+      yearDays: number
+      monthDays: number
+      weekDays: number
+      dayHours: number
+    }
+  }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -90,5 +106,17 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   dashboard: {
     upcomingWindowDays: 7,
+  },
+  canvas: {
+    soundEnabled: true,
+    // Bitişik ölçeklerin tipik sürelerinin geometrik ortalaması (ör. yıl3(1095g) ve yıl(365g)
+    // arası √(1095×365)≈632g) — bkz. docs/decisions, kullanıcı Ayarlar'dan değiştirebilir.
+    scaleThresholds: {
+      year3Days: 632,
+      yearDays: 104,
+      monthDays: 14.5,
+      weekDays: 2.6,
+      dayHours: 4.9,
+    },
   },
 }

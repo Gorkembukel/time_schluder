@@ -25,6 +25,7 @@ export function GoalForm({
   scale,
   task,
   parentTaskId: fixedParentId,
+  defaultLifeAreaId,
   defaultRange,
   onDone,
 }: {
@@ -34,6 +35,8 @@ export function GoalForm({
   task?: Task
   /** Verilirse ebeveyn sabittir (ağaçta "alt iş ekle" akışı). */
   parentTaskId?: string
+  /** Verilirse hayat alanı alanı bu değerle önceden doldurulur (ör. Kanvas bir alana sabitliyken). */
+  defaultLifeAreaId?: string
   defaultRange: { start: Date; end: Date }
   onDone: () => void
 }) {
@@ -45,7 +48,7 @@ export function GoalForm({
   const [startDate, setStartDate] = useState(toDateInputValue(defaultRange.start))
   const [endDate, setEndDate] = useState(toDateInputValue(defaultRange.end))
   const [parentId, setParentId] = useState(fixedParentId ?? task?.parentTaskId ?? '')
-  const [lifeAreaId, setLifeAreaId] = useState(task?.lifeAreaId ?? '')
+  const [lifeAreaId, setLifeAreaId] = useState(task?.lifeAreaId ?? defaultLifeAreaId ?? '')
   const [requirementId, setRequirementId] = useState(task?.requirementId ?? '')
   const [error, setError] = useState<string | null>(null)
 

@@ -90,3 +90,25 @@ body {
     animation: none;
   }
 }
+
+/** Görsel Planlama Kanvası: "şimdi" çizgisi tam bu işin içinden geçerken (o an sürüyorken) hafif canlanma. */
+@keyframes active-now-pulse {
+  0%,
+  100% {
+    filter: brightness(1.08) saturate(1.1);
+  }
+  50% {
+    filter: brightness(1.26) saturate(1.25);
+  }
+}
+
+.active-now-pulse {
+  animation: active-now-pulse 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .active-now-pulse {
+    animation: none;
+    filter: brightness(1.18) saturate(1.2);
+  }
+}
