@@ -131,7 +131,14 @@ export async function createTasksBatch(uid: string, tasks: Task[]): Promise<void
 export type TaskFieldsUpdate = Partial<
   Pick<
     Task,
-    'title' | 'startAt' | 'endAt' | 'parentTaskId' | 'lifeAreaId' | 'requirementId' | 'accentColor'
+    | 'title'
+    | 'startAt'
+    | 'endAt'
+    | 'parentTaskId'
+    | 'lifeAreaId'
+    | 'requirementId'
+    | 'accentColor'
+    | 'canvasY'
   >
 > & { actualMinutes?: number | '' }
 

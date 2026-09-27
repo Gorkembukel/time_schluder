@@ -3,6 +3,7 @@ import {
   boundingRange,
   dependencyEdgeSides,
   inferDependencyType,
+  inferScaleFromDuration,
   layoutNodes,
   panView,
   timeRatio,
@@ -122,5 +123,24 @@ describe('inferDependencyType / dependencyEdgeSides', () => {
       const { fromSide, toSide } = dependencyEdgeSides(type)
       expect(inferDependencyType(fromSide, toSide)).toBe(type)
     }
+  })
+})
+
+describe('inferScaleFromDuration', () => {
+  const HOUR_MS = 3_600_000
+  const DAY_MS = 24 * HOUR_MS
+
+  it('tipik süreler için beklenen ölçeği döner', () => {
+    expect(inferScaleFromDuration(3 * 365 * DAY_MS)).toBe('year3')
+    expect(inferScaleFromDuration(365 * DAY_MS)).toBe('year')
+    expect(inferScaleFromDuration(30 * DAY_MS)).toBe('month')
+    expect(inferScaleFromDuration(7 * DAY_MS)).toBe('week')
+    expect(inferScaleFromDuration(DAY_MS)).toBe('day')
+    expect(inferScaleFromDuration(2 * HOUR_MS)).toBe('hour')
+  })
+
+  it('çok kısa ve çok uzun uçlarda sınırları aşmaz', () => {
+    expect(inferScaleFromDuration(0)).toBe('hour')
+    expect(inferScaleFromDuration(100 * 365 * DAY_MS)).toBe('year3')
   })
 })

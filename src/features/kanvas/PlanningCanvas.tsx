@@ -38,6 +38,7 @@ import {
   boundingRange,
   dependencyEdgeSides,
   inferDependencyType,
+  inferScaleFromDuration,
   layoutNodes,
   panView,
   timeRatio,
@@ -50,12 +51,14 @@ import { EmptyState } from '../../components/EmptyState'
 import { DEFAULT_AREA_COLOR } from '../hayat-alanlari/AreaCard'
 import {
   PLANNING_SCALE_LABELS,
+  TASK_KINDS,
   type CanvasDraft,
   type CanvasDraftEdge,
   type CanvasDraftNode,
   type CanvasDraftPoolItem,
   type PlanningScale,
   type Task,
+  type TaskKind,
 } from '../../types/domain'
 
 type Side = 'left' | 'right'
@@ -84,8 +87,6 @@ const BUTTON_ZOOM_OUT_FACTOR = 1 / BUTTON_ZOOM_IN_FACTOR
 const CENTER_RATIO = 0.5
 const PERCENT = 100
 
-const DRAFT_ZONE_HEIGHT_PX = 150
-const ZONE_GAP_PX = 14
 const LANE_HEIGHT_PX = 56
 const NODE_HEIGHT_PX = 44
 const NODE_TOP_OFFSET_PX = (LANE_HEIGHT_PX - NODE_HEIGHT_PX) / 2
@@ -97,6 +98,10 @@ const DEFAULT_HOURS = 4
 const MIN_NODE_WIDTH_PX = 64
 const GHOST_WIDTH_PX = 90
 const GHOST_HALF_WIDTH_PX = GHOST_WIDTH_PX / 2
+const MILESTONE_SIZE_PX = 18
+const MILESTONE_DURATION_MS = 60_000
+const CANVAS_GAP_PX = 16
+const MIN_CANVAS_HEIGHT_PX = 240
 
 function curvePath(from: Point, to: Point): string {
   return `M ${from.x},${from.y} C ${from.x + CURVE_OFFSET_PX},${from.y} ${to.x - CURVE_OFFSET_PX},${to.y} ${to.x},${to.y}`
@@ -169,6 +174,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   const [previewRealDeltaMs, setPreviewRealDeltaMs] = useState<{
     taskId: string
     deltaMs: number
+    y: number
   } | null>(null)
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null)
   const [editingPoolId, setEditingPoolId] = useState<string | null>(null)
@@ -221,10 +227,10 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   }
 
   // ---- havuz ----
-  function addPoolItem(title: string, hours: number, accentColor: string) {
+  function addPoolItem(title: string, hours: number, accentColor: string, kind: TaskKind) {
     persistDraft({
       ...draft,
-      pool: [...draft.pool, { id: newTaskId(uid), title, hours, accentColor }],
+      pool: [...draft.pool, { id: newTaskId(uid), title, hours, accentColor, kind }],
     })
   }
   function removePoolItem(id: string) {
@@ -252,11 +258,30 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     })
   }
 
-  // ---- konum çözümleme (taslak + gerçek işler tek pist üzerinde) ----
-  const realLayout = useMemo(() => layoutNodes(realTasks, currentView), [realTasks, currentView])
-  const realLaneCount = realLayout.reduce((max, n) => Math.max(max, n.lane + 1), 1)
-  const realZoneTop = DRAFT_ZONE_HEIGHT_PX + ZONE_GAP_PX
-  const totalHeight = realZoneTop + realLaneCount * LANE_HEIGHT_PX
+  // ---- konum çözümleme: taslaklar ve gerçek işler AYNI serbest kanvasta (artifact'teki gibi) ----
+  // Gerçek bir iş sürüklenip bırakıldıysa kendi dikey konumunu (canvasY) hatırlar; hiç
+  // sürüklenmemiş olanlar (ör. kanvas dışında oluşturulmuş) çakışmayı önlemek için otomatik
+  // lane'lere sığdırılır, en alta (mevcut her şeyin altına) yerleştirilir.
+  const realLayoutAll = useMemo(() => layoutNodes(realTasks, currentView), [realTasks, currentView])
+  const realTasksNeedingAutoY = useMemo(
+    () => realTasks.filter((t) => t.canvasY == null),
+    [realTasks],
+  )
+  const autoLayout = useMemo(
+    () => layoutNodes(realTasksNeedingAutoY, currentView),
+    [realTasksNeedingAutoY, currentView],
+  )
+  const explicitMaxY = Math.max(
+    0,
+    ...draft.nodes.map((n) => n.y),
+    ...realTasks.filter((t) => t.canvasY != null).map((t) => t.canvasY as number),
+  )
+  const autoLaneTop = explicitMaxY > 0 ? explicitMaxY + NODE_HEIGHT_PX + CANVAS_GAP_PX : 0
+  const autoLaneCount = autoLayout.reduce((max, n) => Math.max(max, n.lane + 1), 0)
+  const totalHeight = Math.max(
+    MIN_CANVAS_HEIGHT_PX,
+    autoLaneTop + autoLaneCount * LANE_HEIGHT_PX + CANVAS_GAP_PX,
+  )
 
   interface Resolved {
     x: number
@@ -265,21 +290,29 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   }
   const resolvedById = new Map<string, Resolved>()
   for (const node of draft.nodes) {
+    const isMilestone = node.kind === 'milestone'
     resolvedById.set(node.id, {
       x: node.x,
-      width: Math.max(
-        MIN_NODE_WIDTH_PX,
-        (node.hours * HOUR_MS) /
-          ((currentView.end.getTime() - currentView.start.getTime()) / Math.max(containerWidth, 1)),
-      ),
-      y: Math.min(node.y, DRAFT_ZONE_HEIGHT_PX - NODE_HEIGHT_PX),
+      width: isMilestone
+        ? 0
+        : Math.max(
+            MIN_NODE_WIDTH_PX,
+            (node.hours * HOUR_MS) /
+              ((currentView.end.getTime() - currentView.start.getTime()) / Math.max(containerWidth, 1)),
+          ),
+      y: Math.max(0, node.y),
     })
   }
-  for (const rn of realLayout) {
-    resolvedById.set(rn.task.id, {
+  const autoLaneByTaskId = new Map(autoLayout.map((n) => [n.task.id, n.lane]))
+  for (const rn of realLayoutAll) {
+    const task = rn.task
+    const y =
+      task.canvasY ??
+      autoLaneTop + (autoLaneByTaskId.get(task.id) ?? 0) * LANE_HEIGHT_PX + NODE_TOP_OFFSET_PX
+    resolvedById.set(task.id, {
       x: rn.left * containerWidth,
-      width: rn.width * containerWidth,
-      y: realZoneTop + rn.lane * LANE_HEIGHT_PX + NODE_TOP_OFFSET_PX,
+      width: task.kind === 'milestone' ? 0 : rn.width * containerWidth,
+      y,
     })
   }
 
@@ -367,7 +400,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
           return {
             ...n,
             x: g.startX + deltaX,
-            y: Math.min(Math.max(0, g.startY + deltaY), DRAFT_ZONE_HEIGHT_PX - NODE_HEIGHT_PX),
+            y: Math.max(0, g.startY + deltaY),
           }
         }),
       }
@@ -386,22 +419,29 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
     const startClientX = e.clientX
+    const startClientY = e.clientY
+    const startY = resolvedById.get(task.id)?.y ?? 0
     const durationMs = currentView.end.getTime() - currentView.start.getTime()
     const mpp = containerWidth > 0 ? durationMs / containerWidth : 0
-    setPreviewRealDeltaMs({ taskId: task.id, deltaMs: 0 })
+    setPreviewRealDeltaMs({ taskId: task.id, deltaMs: 0, y: startY })
     function onMove(ev: PointerEvent) {
-      setPreviewRealDeltaMs({ taskId: task.id, deltaMs: (ev.clientX - startClientX) * mpp })
+      setPreviewRealDeltaMs({
+        taskId: task.id,
+        deltaMs: (ev.clientX - startClientX) * mpp,
+        y: Math.max(0, startY + (ev.clientY - startClientY)),
+      })
     }
     function onUp() {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       setPreviewRealDeltaMs((prev) => {
-        if (prev && Math.abs(prev.deltaMs) >= 1) {
+        if (prev && (Math.abs(prev.deltaMs) >= 1 || prev.y !== startY)) {
           const newStart = new Date(new Date(task.startAt).getTime() + prev.deltaMs)
           const newEnd = new Date(new Date(task.endAt).getTime() + prev.deltaMs)
           void updateTaskFields(uid, task.id, {
             startAt: newStart.toISOString(),
             endAt: newEnd.toISOString(),
+            canvasY: prev.y,
           })
         }
         return null
@@ -428,10 +468,13 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
         ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom
       if (!overCanvas) return
       const x = ev.clientX - rect.left - GHOST_HALF_WIDTH_PX
-      const y = Math.min(Math.max(0, ev.clientY - rect.top - NODE_HEIGHT_PX / 2), DRAFT_ZONE_HEIGHT_PX - NODE_HEIGHT_PX)
+      const y = Math.max(0, ev.clientY - rect.top - NODE_HEIGHT_PX / 2)
       persistDraft({
         pool: draft.pool.filter((p) => p.id !== item.id),
-        nodes: [...draft.nodes, { id: item.id, title: item.title, hours: item.hours, x, y, accentColor: item.accentColor }],
+        nodes: [
+          ...draft.nodes,
+          { id: item.id, title: item.title, hours: item.hours, x, y, accentColor: item.accentColor, kind: item.kind },
+        ],
         edges: draft.edges,
       })
     }
@@ -457,13 +500,17 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
 
   // ---- kilitle: taslağı gerçek bir işe dönüştürür ----
   async function lockDraftNode(node: CanvasDraftNode) {
+    const isMilestone = node.kind === 'milestone'
     const startAt = new Date(currentView.start.getTime() + (node.x / Math.max(containerWidth, 1)) * (currentView.end.getTime() - currentView.start.getTime()))
-    const endAt = new Date(startAt.getTime() + node.hours * HOUR_MS)
+    const endAt = new Date(startAt.getTime() + (isMilestone ? MILESTONE_DURATION_MS : node.hours * HOUR_MS))
+    // Kilometre taşının süresi yok — bulunduğu kanvas seviyesine (bağlama) aittir. Görevin ölçeği
+    // ise hangi derinlikte oluşturulduğundan bağımsız, kendi süresinden çıkarılır.
+    const scale = isMilestone ? currentLevel.scale : inferScaleFromDuration(node.hours * HOUR_MS)
     const id = newTaskId(uid)
     const newTask: Task = {
       id,
       title: node.title,
-      scale: currentLevel.scale,
+      scale,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
       parentTaskId: currentLevel.parentTaskId,
@@ -473,6 +520,8 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
       bufferMinutes: 0,
       detailLevel: 'detailed',
       accentColor: node.accentColor,
+      kind: node.kind,
+      canvasY: node.y,
     }
 
     // Bu taslağa değen kenarları çöz: karşı taraf gerçek bir işse hemen bağımlılığa dönüştür,
@@ -601,8 +650,8 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
         editingPoolId={editingPoolId}
         showAddForm={showAddForm}
         onToggleAddForm={() => setShowAddForm((v) => !v)}
-        onAdd={(title, hours, accentColor) => {
-          addPoolItem(title, hours, accentColor)
+        onAdd={(title, hours, accentColor, kind) => {
+          addPoolItem(title, hours, accentColor, kind)
           setShowAddForm(false)
         }}
         onStartEdit={setEditingPoolId}
@@ -623,15 +672,6 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
         className="relative cursor-grab overflow-hidden rounded-lg border border-border bg-bg/40 active:cursor-grabbing"
         style={{ height: totalHeight }}
       >
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 border-b border-dashed border-border/70 bg-bg/20"
-          style={{ height: DRAFT_ZONE_HEIGHT_PX }}
-        >
-          <span className="absolute left-2 top-1 text-[0.65rem] uppercase tracking-wide text-text-secondary">
-            Taslaklar (henüz tarihe bağlı değil)
-          </span>
-        </div>
 
         {showNow && (
           <div
@@ -713,6 +753,81 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
           }
           const r = resolvedById.get(node.id)
           if (!r) return null
+          const isMilestone = node.kind === 'milestone'
+          const background = twoTone(areaColor, node.accentColor ?? DEFAULT_ACCENT_COLOR)
+          const lockedAt = format(
+            new Date(
+              currentView.start.getTime() +
+                (node.x / Math.max(containerWidth, 1)) *
+                  (currentView.end.getTime() - currentView.start.getTime()),
+            ),
+            'd MMM',
+            { locale: tr },
+          )
+          const actions = (
+            <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditingDraftId(node.id)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label={`${node.title}: düzenle`}
+                className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+              >
+                ✎
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void lockDraftNode(node)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label={`${node.title}: kilitle (${lockedAt} tarihine)`}
+                title="Kilitle: o an cetvelin altındaki tarihe bağla, gerçek bir işe dönüştür"
+                className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+              >
+                <Lock size={ICON_SIZE} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeDraftNode(node.id)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label={`${node.title}: sil`}
+                className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-danger"
+              >
+                <X size={ICON_SIZE} />
+              </button>
+            </div>
+          )
+
+          if (isMilestone) {
+            return (
+              <div
+                key={node.id}
+                data-canvas-id={node.id}
+                onPointerDown={(e) => handleDraftBodyPointerDown(e, node)}
+                className="group absolute flex cursor-grab items-center gap-1.5 active:cursor-grabbing"
+                style={{ left: r.x - MILESTONE_SIZE_PX / 2, top: r.y }}
+              >
+                <NodePorts id={node.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
+                <div
+                  className="rotate-45 rounded-sm border border-dashed border-text-secondary/60 shadow-sm"
+                  style={{ width: MILESTONE_SIZE_PX, height: MILESTONE_SIZE_PX, background }}
+                />
+                <div className="whitespace-nowrap rounded bg-surface/90 px-1.5 py-0.5 text-xs text-text shadow-sm">
+                  {node.title} <span className="text-text-secondary">· taslak</span>
+                </div>
+                {actions}
+              </div>
+            )
+          }
+
           return (
             <div
               key={node.id}
@@ -724,117 +839,109 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
                 top: r.y,
                 width: r.width,
                 height: NODE_HEIGHT_PX,
-                background: twoTone(areaColor, node.accentColor ?? DEFAULT_ACCENT_COLOR),
+                background,
               }}
             >
               <NodePorts id={node.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
               <span className="truncate font-medium">{node.title}</span>
               <span className="truncate text-[0.65rem]">{node.hours}s · taslak</span>
-              <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setEditingDraftId(node.id)
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label={`${node.title}: düzenle`}
-                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
-                >
-                  ✎
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void lockDraftNode(node)
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label={`${node.title}: kilitle (${format(new Date(currentView.start.getTime() + (node.x / Math.max(containerWidth, 1)) * (currentView.end.getTime() - currentView.start.getTime())), 'd MMM', { locale: tr })} tarihine)`}
-                  title="Kilitle: o an cetvelin altındaki tarihe bağla, gerçek bir işe dönüştür"
-                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
-                >
-                  <Lock size={ICON_SIZE} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeDraftNode(node.id)
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label={`${node.title}: sil`}
-                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-danger"
-                >
-                  <X size={ICON_SIZE} />
-                </button>
-              </div>
+              {actions}
             </div>
           )
         })}
 
-        {realLayout.map(({ task }) => {
+        {realLayoutAll.map(({ task }) => {
           const r = resolvedById.get(task.id)
           if (!r) return null
-          const preview = previewRealDeltaMs?.taskId === task.id ? previewRealDeltaMs.deltaMs : 0
-          const previewPx = containerWidth > 0 ? preview : 0
+          const isMilestone = task.kind === 'milestone'
+          const previewing = previewRealDeltaMs?.taskId === task.id
+          const previewPx = previewing && containerWidth > 0 ? previewRealDeltaMs.deltaMs : 0
+          const topPx = previewing ? previewRealDeltaMs.y : r.y
           const now = new Date()
           const isActiveNow = now >= new Date(task.startAt) && now < new Date(task.endAt)
-          const canBreakDown = task.status !== 'done' && BREAKDOWN_SCALES.includes(task.scale)
-          const canOpen = finerScale(task.scale) !== null && finerScale(task.scale) !== 'hour'
+          const canBreakDown = !isMilestone && task.status !== 'done' && BREAKDOWN_SCALES.includes(task.scale)
+          const canOpen = !isMilestone && finerScale(task.scale) !== null && finerScale(task.scale) !== 'hour'
+          const metaText = isMilestone
+            ? format(new Date(task.startAt), 'd MMM', { locale: tr })
+            : `${PLANNING_SCALE_LABELS[task.scale]} · ${format(new Date(task.startAt), 'd MMM', { locale: tr })}`
+          const actions = (
+            <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
+              {canBreakDown && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleBreakdown(task)
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label={`${task.title}: planı parçala`}
+                  title="Planı parçala (alt dönemlere böl)"
+                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+                >
+                  <GitBranchPlus size={ICON_SIZE} />
+                </button>
+              )}
+              {canOpen && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    enterSubCanvas(task)
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label={`${task.title}: içine gir`}
+                  title="İçine gir (alt-kanvas)"
+                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+                >
+                  <Maximize size={ICON_SIZE} />
+                </button>
+              )}
+            </div>
+          )
+          const background = twoTone(areaColor, task.accentColor ?? DEFAULT_ACCENT_COLOR)
+          const statusClass =
+            task.status === 'done' ? 'border-success/50 opacity-70 line-through' : 'border-primary/40'
+
+          if (isMilestone) {
+            return (
+              <div
+                key={task.id}
+                data-canvas-id={task.id}
+                onPointerDown={(e) => handleRealBodyPointerDown(e, task)}
+                className={`group absolute flex cursor-grab items-center gap-1.5 active:cursor-grabbing ${isActiveNow ? 'active-now-pulse' : ''}`}
+                style={{ left: r.x + previewPx - MILESTONE_SIZE_PX / 2, top: topPx }}
+              >
+                <NodePorts id={task.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
+                <div
+                  className={`rotate-45 rounded-sm border shadow-sm ${statusClass}`}
+                  style={{ width: MILESTONE_SIZE_PX, height: MILESTONE_SIZE_PX, background }}
+                />
+                <div className="whitespace-nowrap rounded bg-surface/90 px-1.5 py-0.5 text-xs text-text shadow-sm">
+                  {task.title} <span className="text-text-secondary">· {metaText}</span>
+                </div>
+                {actions}
+              </div>
+            )
+          }
+
           return (
             <div
               key={task.id}
               data-canvas-id={task.id}
               onPointerDown={(e) => handleRealBodyPointerDown(e, task)}
-              className={`group absolute flex cursor-grab flex-col justify-center overflow-hidden rounded-md border px-2 py-1 text-xs text-text shadow-sm active:cursor-grabbing ${
-                task.status === 'done' ? 'border-success/50 opacity-70 line-through' : 'border-primary/40'
-              } ${isActiveNow ? 'active-now-pulse' : ''}`}
+              className={`group absolute flex cursor-grab flex-col justify-center overflow-hidden rounded-md border px-2 py-1 text-xs text-text shadow-sm active:cursor-grabbing ${statusClass} ${isActiveNow ? 'active-now-pulse' : ''}`}
               style={{
                 left: r.x + previewPx,
-                top: r.y,
+                top: topPx,
                 width: r.width,
                 height: NODE_HEIGHT_PX,
-                background: twoTone(areaColor, task.accentColor ?? DEFAULT_ACCENT_COLOR),
+                background,
               }}
             >
               <NodePorts id={task.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
               <span className="truncate font-medium">{task.title}</span>
-              <span className="truncate text-[0.65rem]">
-                {PLANNING_SCALE_LABELS[task.scale]} · {format(new Date(task.startAt), 'd MMM', { locale: tr })}
-              </span>
-              <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
-                {canBreakDown && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void handleBreakdown(task)
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    aria-label={`${task.title}: planı parçala`}
-                    title="Planı parçala (alt dönemlere böl)"
-                    className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
-                  >
-                    <GitBranchPlus size={ICON_SIZE} />
-                  </button>
-                )}
-                {canOpen && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      enterSubCanvas(task)
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    aria-label={`${task.title}: içine gir`}
-                    title="İçine gir (alt-kanvas)"
-                    className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
-                  >
-                    <Maximize size={ICON_SIZE} />
-                  </button>
-                )}
-              </div>
+              <span className="truncate text-[0.65rem]">{metaText}</span>
+              {actions}
             </div>
           )
         })}
@@ -924,7 +1031,7 @@ function PoolPanel({
   editingPoolId: string | null
   showAddForm: boolean
   onToggleAddForm: () => void
-  onAdd: (title: string, hours: number, accentColor: string) => void
+  onAdd: (title: string, hours: number, accentColor: string, kind: TaskKind) => void
   onStartEdit: (id: string) => void
   onCancelEdit: () => void
   onSaveEdit: (id: string, fields: Partial<CanvasDraftPoolItem>) => void
@@ -934,6 +1041,7 @@ function PoolPanel({
   const [title, setTitle] = useState('')
   const [hours, setHours] = useState(String(DEFAULT_HOURS))
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR)
+  const [kind, setKind] = useState<TaskKind>('task')
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -957,11 +1065,23 @@ function PoolPanel({
             e.preventDefault()
             const trimmed = title.trim()
             if (!trimmed) return
-            onAdd(trimmed, Number(hours) || DEFAULT_HOURS, accentColor)
+            onAdd(trimmed, Number(hours) || DEFAULT_HOURS, accentColor, kind)
             setTitle('')
             setHours(String(DEFAULT_HOURS))
           }}
         >
+          <div className="flex rounded-lg border border-border p-0.5 text-xs">
+            {TASK_KINDS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={`rounded-md px-2 py-1 ${kind === k ? 'bg-primary text-primary-text' : 'text-text-secondary'}`}
+              >
+                {k === 'task' ? 'Görev' : 'Kilometre taşı'}
+              </button>
+            ))}
+          </div>
           <input
             ref={titleInputRef}
             required
@@ -970,16 +1090,18 @@ function PoolPanel({
             placeholder="Görev adı"
             className="min-w-[10rem] flex-1 rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text"
           />
-          <input
-            type="number"
-            min={0.5}
-            step={0.5}
-            required
-            value={hours}
-            onChange={(e) => setHours(e.target.value)}
-            aria-label="Süre (saat)"
-            className="w-20 rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text"
-          />
+          {kind === 'task' && (
+            <input
+              type="number"
+              min={0.5}
+              step={0.5}
+              required
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              aria-label="Süre (saat)"
+              className="w-20 rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text"
+            />
+          )}
           <input
             type="color"
             value={accentColor}
@@ -1009,8 +1131,11 @@ function PoolPanel({
                 className="group flex cursor-grab items-center gap-1.5 rounded-lg border border-dashed border-text-secondary/50 px-2 py-1 text-xs text-text active:cursor-grabbing"
                 style={{ background: twoTone(areaColor, item.accentColor ?? DEFAULT_ACCENT_COLOR) }}
               >
+                {item.kind === 'milestone' && (
+                  <span aria-hidden className="h-2 w-2 shrink-0 rotate-45 rounded-[1px] bg-text/70" />
+                )}
                 <span className="font-medium">{item.title}</span>
-                <span className="opacity-80">{item.hours}s</span>
+                {item.kind !== 'milestone' && <span className="opacity-80">{item.hours}s</span>}
                 <button
                   type="button"
                   onPointerDown={(e) => e.stopPropagation()}
@@ -1072,15 +1197,17 @@ function PoolEditForm({
           onChange={(e) => setTitle(e.target.value)}
           className="w-24 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
         />
-        <input
-          type="number"
-          min={0.5}
-          step={0.5}
-          required
-          value={hours}
-          onChange={(e) => setHours(e.target.value)}
-          className="w-14 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
-        />
+        {item.kind !== 'milestone' && (
+          <input
+            type="number"
+            min={0.5}
+            step={0.5}
+            required
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            className="w-14 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+          />
+        )}
         <input
           type="color"
           value={accentColor}
@@ -1136,16 +1263,20 @@ function DraftEditForm({
         className="rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
       />
       <div className="flex items-center gap-1">
-        <input
-          type="number"
-          min={0.5}
-          step={0.5}
-          required
-          value={hours}
-          onChange={(e) => setHours(e.target.value)}
-          className="w-16 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
-        />
-        <span className="text-text-secondary">saat</span>
+        {node.kind !== 'milestone' && (
+          <>
+            <input
+              type="number"
+              min={0.5}
+              step={0.5}
+              required
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              className="w-16 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+            />
+            <span className="text-text-secondary">saat</span>
+          </>
+        )}
         <input
           type="color"
           value={accentColor}

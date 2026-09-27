@@ -104,6 +104,10 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 
 export const OVERDUE_LABEL = 'Gecikti'
 
+/** Süreli bir "görev" mi, yoksa süresiz, ilerlemeyi işaretleyen bir "kilometre taşı" mı. */
+export const TASK_KINDS = ['task', 'milestone'] as const
+export type TaskKind = (typeof TASK_KINDS)[number]
+
 export interface Task {
   id: string
   title: string
@@ -123,6 +127,10 @@ export interface Task {
   completedAt?: string
   /** Görsel Planlama Kanvası'nda köşegenin ikinci yarısında gösterilen, kullanıcının seçtiği renk (hex). */
   accentColor?: string
+  /** Opsiyonel — belirtilmezse 'task'. Kilometre taşları süresiz kabul edilir, kanvasta baklava dilimi olarak gösterilir. */
+  kind?: TaskKind
+  /** Görsel Planlama Kanvası'ndaki serbest dikey konum (piksel) — yatay konum tarihten türetilir. */
+  canvasY?: number
 }
 
 /** Görsel Planlama Kanvası'nda henüz bir tarihe kilitlenmemiş, kanvasta serbest bir piksel konumunda duran taslak iş. */
@@ -133,6 +141,8 @@ export interface CanvasDraftNode {
   x: number
   y: number
   accentColor?: string
+  /** Opsiyonel — belirtilmezse 'task'. */
+  kind?: TaskKind
 }
 
 /** Havuzdaki (henüz kanvasa hiç yerleştirilmemiş) taslak iş — yalnızca isim ve süre taşır. */
@@ -141,6 +151,8 @@ export interface CanvasDraftPoolItem {
   title: string
   hours: number
   accentColor?: string
+  /** Opsiyonel — belirtilmezse 'task'. */
+  kind?: TaskKind
 }
 
 /**

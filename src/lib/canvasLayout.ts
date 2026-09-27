@@ -1,5 +1,5 @@
 import type { DateRange } from './dateRange'
-import type { DependencyType, Task } from '../types/domain'
+import type { DependencyType, PlanningScale, Task } from '../types/domain'
 
 /**
  * Görsel Planlama Kanvası'nın saf (side-effect'siz) yerleşim hesapları: tek, sürekli bir zaman
@@ -102,6 +102,32 @@ export function panView(view: DateRange, deltaMs: number, bounds: DateRange): Da
     Math.max(maxStartMs, bounds.start.getTime()),
   )
   return { start: new Date(startMs), end: new Date(startMs + durationMs) }
+}
+
+const HOURS_PER_DAY = 24
+const HOUR_MS = 3_600_000
+const DAY_MS = HOURS_PER_DAY * HOUR_MS
+
+// Eşikler, bitişik ölçeklerin tipik sürelerinin (yıl3=1095g, yıl=365g, ay=30g, hafta=7g, gün=1g,
+// saat=1g/24) geometrik ortalamasıdır — ör. yıl3 ve yıl arası √(1095×365)≈632g.
+const YEAR3_THRESHOLD_DAYS = 632
+const YEAR_THRESHOLD_DAYS = 104
+const MONTH_THRESHOLD_DAYS = 14.5
+const WEEK_THRESHOLD_DAYS = 2.6
+const DAY_THRESHOLD_HOURS = 4.9
+
+/**
+ * Bir sürenin (ms) hangi 3 yıl/yıl/ay/hafta/gün/saat ölçeğine en yakın olduğunu çıkarır.
+ * Görsel Planlama Kanvası'nda kilitlenen bir görevin ölçeğini, hangi kanvas derinliğinde
+ * oluşturulduğundan bağımsız olarak, kendi süresinden belirler.
+ */
+export function inferScaleFromDuration(durationMs: number): PlanningScale {
+  if (durationMs >= YEAR3_THRESHOLD_DAYS * DAY_MS) return 'year3'
+  if (durationMs >= YEAR_THRESHOLD_DAYS * DAY_MS) return 'year'
+  if (durationMs >= MONTH_THRESHOLD_DAYS * DAY_MS) return 'month'
+  if (durationMs >= WEEK_THRESHOLD_DAYS * DAY_MS) return 'week'
+  if (durationMs >= DAY_THRESHOLD_HOURS * HOUR_MS) return 'day'
+  return 'hour'
 }
 
 export type EdgeSide = 'start' | 'end'
