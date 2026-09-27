@@ -73,6 +73,8 @@ export interface Requirement {
   targetMetric: number
   currentValue: number
   unit: string
+  /** Üst gereklilik (aynı hayat alanı içinde) — ör. "Robotik" altında "ROS bilgisi", "Arduino kiti". */
+  parentRequirementId?: string
   createdAt: string
   updatedAt: string
 }
@@ -117,6 +119,8 @@ export interface Task {
   actualMinutes?: number
   /** Tamamlandı'ya geçtiği an (oyunlaştırma: seri ve zamanında bitirme bonusu için). */
   completedAt?: string
+  /** Görsel Planlama Kanvası'nda kilitli mi — kilitliyken kanvasta sürükleyerek zamanı değiştirilemez. */
+  scaleLocked?: boolean
 }
 
 /**

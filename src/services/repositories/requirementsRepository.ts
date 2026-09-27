@@ -37,6 +37,8 @@ export interface NewRequirementInput {
   targetMetric: number
   currentValue: number
   unit: string
+  /** Üst gereklilik — verilirse bu, o gerekliliğin altında bir alt gereklilik olur. */
+  parentRequirementId?: string
 }
 
 export async function createRequirement(

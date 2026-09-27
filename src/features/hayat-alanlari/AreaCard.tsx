@@ -33,6 +33,8 @@ const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-sm text
 const PROGRESS_MAX_PERCENT = 100
 const LOADING_ROW_COUNT = 2
 const ICON_SIZE = 14
+/** Alt gereklilik ağacında her derinlik seviyesinin girinti miktarı (rem). */
+const DEPTH_INDENT_REM = 0.5
 
 export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   const { requirements, loading } = useRequirements(uid, area.id)
@@ -145,12 +147,13 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
             ) : requirements.length === 0 ? (
               <p className="text-sm text-text-secondary">Henüz gereklilik yok.</p>
             ) : (
-              requirements.map((requirement) => (
-                <RequirementRow
+              topLevelRequirements(requirements).map((requirement) => (
+                <RequirementNode
                   key={requirement.id}
                   uid={uid}
                   areaId={area.id}
                   requirement={requirement}
+                  all={requirements}
                 />
               ))
             )}
@@ -179,7 +182,25 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   )
 }
 
-function requirementProgress(requirement: Requirement): number {
+function topLevelRequirements(requirements: Requirement[]): Requirement[] {
+  return requirements.filter((r) => !r.parentRequirementId)
+}
+
+function childrenOf(requirements: Requirement[], parentId: string): Requirement[] {
+  return requirements.filter((r) => r.parentRequirementId === parentId)
+}
+
+/**
+ * Gerekliliğin ilerleme oranı: alt gerekliliği varsa Task'taki gibi alttan üste toplanır
+ * (çocukların ortalaması); yaprak ise kendi `currentValue`/`targetMetric` oranı kullanılır.
+ */
+function requirementProgress(requirement: Requirement, all: Requirement[]): number {
+  const kids = childrenOf(all, requirement.id)
+  if (kids.length > 0) {
+    return Math.round(
+      kids.reduce((sum, k) => sum + requirementProgress(k, all), 0) / kids.length,
+    )
+  }
   return requirement.targetMetric > 0
     ? Math.min(
         PROGRESS_MAX_PERCENT,
@@ -189,79 +210,144 @@ function requirementProgress(requirement: Requirement): number {
 }
 
 function averageProgress(requirements: Requirement[]): number {
-  if (requirements.length === 0) return 0
+  const topLevel = topLevelRequirements(requirements)
+  if (topLevel.length === 0) return 0
   return Math.round(
-    requirements.reduce((sum, r) => sum + requirementProgress(r), 0) / requirements.length,
+    topLevel.reduce((sum, r) => sum + requirementProgress(r, requirements), 0) / topLevel.length,
   )
 }
 
-function RequirementRow({
+function RequirementNode({
   uid,
   areaId,
   requirement,
+  all,
+  depth = 0,
 }: {
   uid: string
   areaId: string
   requirement: Requirement
+  /** Bu alanın tüm gereklilikleri — alt/üst ilişkisini kurmak için. */
+  all: Requirement[]
+  depth?: number
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [showAddChild, setShowAddChild] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { tasks, index } = useTaskHierarchy()
   const linkedTasks = tasks.filter((t) => effectiveRequirementId(t, index) === requirement.id)
   const linkedDone = linkedTasks.filter((t) => t.status === 'done').length
-  const progress = requirementProgress(requirement)
+  const kids = childrenOf(all, requirement.id)
+  const isParent = kids.length > 0
+  const progress = requirementProgress(requirement, all)
+
+  async function handleDelete() {
+    if (isParent) {
+      setError('Önce alt gereklilikleri sil.')
+      setConfirmingDelete(false)
+      return
+    }
+    await deleteRequirement(uid, areaId, requirement.id)
+  }
 
   return (
-    <div className="rounded-lg border border-border bg-bg/50 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-sm text-text">{requirement.name}</p>
-          <div className="flex flex-wrap gap-1.5">
-            <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[requirement.type]}</Badge>
-            {linkedTasks.length > 0 && (
-              <Badge variant="primary">
-                {linkedDone}/{linkedTasks.length} bağlı iş tamamlandı
-              </Badge>
+    <div
+      className={depth > 0 ? 'border-l-2 border-border pl-3' : undefined}
+      style={depth > 0 ? { marginLeft: `${depth * DEPTH_INDENT_REM}rem` } : undefined}
+    >
+      <div className="rounded-lg border border-border bg-bg/50 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-sm text-text">{requirement.name}</p>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[requirement.type]}</Badge>
+              {isParent && <Badge variant="primary">{kids.length} alt gereklilik</Badge>}
+              {linkedTasks.length > 0 && (
+                <Badge variant="primary">
+                  {linkedDone}/{linkedTasks.length} bağlı iş tamamlandı
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAddChild((v) => !v)}
+              aria-label={`${requirement.name}: alt gereklilik ekle`}
+              title="Alt gereklilik ekle"
+            >
+              <Plus size={ICON_SIZE} />
+            </Button>
+            {confirmingDelete ? (
+              <div className="flex items-center gap-1 text-xs">
+                <Button variant="danger" size="sm" onClick={() => void handleDelete()}>
+                  Sil
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+                  Vazgeç
+                </Button>
+              </div>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
+                Sil
+              </Button>
             )}
           </div>
         </div>
-        {confirmingDelete ? (
-          <div className="flex items-center gap-1 text-xs">
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => void deleteRequirement(uid, areaId, requirement.id)}
-            >
-              Sil
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
-              Vazgeç
-            </Button>
+        {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+        <div className="mt-2 flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
+            <div
+              className="h-full rounded-full bg-primary transition-all motion-safe:duration-300"
+              style={{ width: `${progress}%` }}
+            />
           </div>
-        ) : (
-          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
-            Sil
-          </Button>
-        )}
+          {isParent ? (
+            <span className="text-xs text-text-secondary">%{progress} (alt gerekliliklerden)</span>
+          ) : (
+            <>
+              <input
+                type="number"
+                className="w-16 rounded-lg border border-border bg-bg px-1.5 py-0.5 text-xs text-text"
+                value={requirement.currentValue}
+                onChange={(e) =>
+                  void updateRequirementProgress(uid, areaId, requirement.id, Number(e.target.value))
+                }
+              />
+              <span className="text-xs text-text-secondary">
+                / {requirement.targetMetric} {requirement.unit}
+              </span>
+            </>
+          )}
+        </div>
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
-          <div
-            className="h-full rounded-full bg-primary transition-all motion-safe:duration-300"
-            style={{ width: `${progress}%` }}
+
+      {showAddChild && (
+        <div className="mt-2">
+          <NewRequirementForm
+            uid={uid}
+            areaId={areaId}
+            parentRequirementId={requirement.id}
+            onDone={() => setShowAddChild(false)}
           />
         </div>
-        <input
-          type="number"
-          className="w-16 rounded-lg border border-border bg-bg px-1.5 py-0.5 text-xs text-text"
-          value={requirement.currentValue}
-          onChange={(e) =>
-            void updateRequirementProgress(uid, areaId, requirement.id, Number(e.target.value))
-          }
-        />
-        <span className="text-xs text-text-secondary">
-          / {requirement.targetMetric} {requirement.unit}
-        </span>
-      </div>
+      )}
+
+      {kids.length > 0 && (
+        <div className="mt-2 flex flex-col gap-2">
+          {kids.map((child) => (
+            <RequirementNode
+              key={child.id}
+              uid={uid}
+              areaId={areaId}
+              requirement={child}
+              all={all}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -269,10 +355,13 @@ function RequirementRow({
 function NewRequirementForm({
   uid,
   areaId,
+  parentRequirementId,
   onDone,
 }: {
   uid: string
   areaId: string
+  /** Verilirse yeni gereklilik bu gerekliliğin altına eklenir. */
+  parentRequirementId?: string
   onDone: () => void
 }) {
   const [name, setName] = useState('')
@@ -295,6 +384,7 @@ function NewRequirementForm({
       targetMetric: Number(targetMetric) || 0,
       currentValue: 0,
       unit: unit.trim(),
+      parentRequirementId,
     })
     onDone()
   }
