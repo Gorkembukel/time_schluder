@@ -50,6 +50,14 @@ export async function updateLifeAreaPriority(
   })
 }
 
+/** Görsel Planlama Kanvası'nda bu alanın işlerini ayırt eden renk (hex). */
+export async function updateLifeAreaColor(uid: string, areaId: string, color: string): Promise<void> {
+  await updateDoc(doc(db, 'users', uid, 'lifeAreas', areaId), {
+    color,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
 /** Alanı ve altındaki tüm gereklilikleri tek batch ile siler (Firestore alt koleksiyonları otomatik silmez). */
 export async function deleteLifeArea(uid: string, areaId: string): Promise<void> {
   const requirementsCol = collection(db, 'users', uid, 'lifeAreas', areaId, 'requirements')

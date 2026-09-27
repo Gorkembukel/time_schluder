@@ -20,7 +20,7 @@ export function PlanningCanvasPage() {
       <PageHeader
         icon={Waypoints}
         title={area ? `${area.name} — Kanvas` : 'Kanvas'}
-        subtitle="Tek, sürekli bir zaman ekseninde 3 Yıl'dan Saat'e tüm işler — fare tekerleğiyle yakınlaş/uzaklaş, boş alanı sürükleyerek kaydır."
+        subtitle="Havuzdan görev sürükleyip zaman şeridine bırakın, birbirine bağlayın, kilitleyip gerçek işe dönüştürün — fare tekerleğiyle yakınlaş/uzaklaş, boş alanı sürükleyerek kaydır."
         actions={
           <Button variant="secondary" size="sm" onClick={() => navigate('/hayat-alanlari')}>
             <ArrowLeft size={ICON_SIZE} />

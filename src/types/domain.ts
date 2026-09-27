@@ -61,6 +61,8 @@ export interface LifeArea {
   name: string
   order: number
   priority?: LifeAreaPriority
+  /** Görsel Planlama Kanvası'nda bu alanın işlerinin köşegenin bir yarısında gösterilen rengi (hex). */
+  color?: string
   createdAt: string
   updatedAt: string
 }
@@ -119,8 +121,47 @@ export interface Task {
   actualMinutes?: number
   /** Tamamlandı'ya geçtiği an (oyunlaştırma: seri ve zamanında bitirme bonusu için). */
   completedAt?: string
-  /** Görsel Planlama Kanvası'nda kilitli mi — kilitliyken kanvasta sürükleyerek zamanı değiştirilemez. */
-  scaleLocked?: boolean
+  /** Görsel Planlama Kanvası'nda köşegenin ikinci yarısında gösterilen, kullanıcının seçtiği renk (hex). */
+  accentColor?: string
+}
+
+/** Görsel Planlama Kanvası'nda henüz bir tarihe kilitlenmemiş, kanvasta serbest bir piksel konumunda duran taslak iş. */
+export interface CanvasDraftNode {
+  id: string
+  title: string
+  hours: number
+  x: number
+  y: number
+  accentColor?: string
+}
+
+/** Havuzdaki (henüz kanvasa hiç yerleştirilmemiş) taslak iş — yalnızca isim ve süre taşır. */
+export interface CanvasDraftPoolItem {
+  id: string
+  title: string
+  hours: number
+  accentColor?: string
+}
+
+/**
+ * Taslak bir bağlantı. `fromId`/`toId` ya bir taslak düğüm id'sine ya da (biri kilitlenip gerçek
+ * bir işe dönüştüyse) gerçek bir Task id'sine işaret edebilir — bkz. `canvasDraftsRepository.ts`.
+ */
+export interface CanvasDraftEdge {
+  fromId: string
+  toId: string
+  fromSide: 'left' | 'right'
+  toSide: 'left' | 'right'
+}
+
+/**
+ * Bir hayat alanının kökü ya da bir işin alt-kanvası için tek taslak belgesi — Görsel Planlama
+ * Kanvası'nda henüz kilitlenmemiş (gerçek bir Task'a dönüşmemiş) her şeyi tutar.
+ */
+export interface CanvasDraft {
+  pool: CanvasDraftPoolItem[]
+  nodes: CanvasDraftNode[]
+  edges: CanvasDraftEdge[]
 }
 
 /**

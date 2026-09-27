@@ -7,21 +7,33 @@ import {
 } from 'react'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
-import { GitBranchPlus, Lock, Maximize, Plus, Shapes, Unlock, ZoomIn, ZoomOut } from 'lucide-react'
+import {
+  ArrowLeft,
+  GitBranchPlus,
+  Lock,
+  Maximize,
+  Plus,
+  Shapes,
+  Trash2,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
+import { useCanvasDraft } from '../../hooks/useCanvasDraft'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import {
   createTasksBatch,
   newTaskId,
   updateTaskDependencies,
   updateTaskFields,
-  updateTaskLock,
 } from '../../services/repositories/tasksRepository'
+import { saveCanvasDraft } from '../../services/repositories/canvasDraftsRepository'
 import { BREAKDOWN_SCALES, planBreakdown } from '../../lib/autoPlanner'
+import { finerScale, YEAR3_SPAN_YEARS } from '../../lib/planning-engine'
 import { checkDependencyLink, withDependency } from '../../lib/dependencyLinking'
-import { playConnectSound } from '../../lib/canvasSound'
-import { effectiveLifeAreaId, overlapsRange } from '../../lib/taskHierarchy'
 import {
   boundingRange,
   dependencyEdgeSides,
@@ -30,97 +42,152 @@ import {
   panView,
   timeRatio,
   zoomView,
-  type CanvasNode,
-  type EdgeSide,
+  type EdgeSide as LibEdgeSide,
 } from '../../lib/canvasLayout'
 import type { DateRange } from '../../lib/dateRange'
 import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
+import { DEFAULT_AREA_COLOR } from '../hayat-alanlari/AreaCard'
 import {
-  PLANNING_SCALES,
   PLANNING_SCALE_LABELS,
+  type CanvasDraft,
+  type CanvasDraftEdge,
+  type CanvasDraftNode,
+  type CanvasDraftPoolItem,
   type PlanningScale,
   type Task,
 } from '../../types/domain'
-import { GoalForm } from '../takvim/GoalForm'
 
-const LANE_HEIGHT_PX = 56
-const NODE_HEIGHT_PX = 40
-const NODE_TOP_OFFSET_PX = (LANE_HEIGHT_PX - NODE_HEIGHT_PX) / 2
-const CURVE_OFFSET_PX = 36
-const HANDLE_SIZE_PX = 10
-const ICON_SIZE = 14
-const LABEL_COLUMN_PX = 64
-const PERCENT = 100
+type Side = 'left' | 'right'
+function toLibSide(side: Side): LibEdgeSide {
+  return side === 'left' ? 'start' : 'end'
+}
 
-const MS_PER_SECOND = 1000
-const SECONDS_PER_MINUTE = 60
-const MINUTES_PER_HOUR = 60
-const HOUR_MS = MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND
-const MIN_VIEW_DURATION_HOURS = 2
-const MIN_VIEW_DURATION_MS = MIN_VIEW_DURATION_HOURS * HOUR_MS
-const WHEEL_ZOOM_IN_FACTOR = 0.85
-const WHEEL_ZOOM_OUT_FACTOR = 1 / WHEEL_ZOOM_IN_FACTOR
-const BUTTON_ZOOM_IN_FACTOR = 0.6
-const BUTTON_ZOOM_OUT_FACTOR = 1 / BUTTON_ZOOM_IN_FACTOR
-const DEFAULT_WINDOW_YEARS = 3
-const CENTER_RATIO = 0.5
+interface ContextLevel {
+  contextId: string
+  scale: PlanningScale
+  parentTaskId?: string
+  label: string
+}
 
 interface Point {
   x: number
   y: number
 }
 
-interface RowLayout {
-  scale: PlanningScale
-  nodes: CanvasNode[]
-  top: number
-  height: number
-}
+const HOUR_MS = 3_600_000
+const MIN_VIEW_DURATION_MS = 2 * HOUR_MS
+const WHEEL_ZOOM_IN_FACTOR = 0.87
+const WHEEL_ZOOM_OUT_FACTOR = 1 / WHEEL_ZOOM_IN_FACTOR
+const BUTTON_ZOOM_IN_FACTOR = 0.6
+const BUTTON_ZOOM_OUT_FACTOR = 1 / BUTTON_ZOOM_IN_FACTOR
+const CENTER_RATIO = 0.5
+const PERCENT = 100
+
+const DRAFT_ZONE_HEIGHT_PX = 150
+const ZONE_GAP_PX = 14
+const LANE_HEIGHT_PX = 56
+const NODE_HEIGHT_PX = 44
+const NODE_TOP_OFFSET_PX = (LANE_HEIGHT_PX - NODE_HEIGHT_PX) / 2
+const CURVE_OFFSET_PX = 36
+const HANDLE_SIZE_PX = 10
+const ICON_SIZE = 14
+const DEFAULT_ACCENT_COLOR = '#f5a524'
+const DEFAULT_HOURS = 4
+const MIN_NODE_WIDTH_PX = 64
+const GHOST_WIDTH_PX = 90
+const GHOST_HALF_WIDTH_PX = GHOST_WIDTH_PX / 2
 
 function curvePath(from: Point, to: Point): string {
   return `M ${from.x},${from.y} C ${from.x + CURVE_OFFSET_PX},${from.y} ${to.x - CURVE_OFFSET_PX},${to.y} ${to.x},${to.y}`
 }
 
+function twoTone(areaColor: string, accentColor: string): string {
+  return `linear-gradient(135deg, ${areaColor} 50%, ${accentColor} 50%)`
+}
+
+function connectedDraftGroup(
+  startId: string,
+  nodes: CanvasDraftNode[],
+  edges: CanvasDraftEdge[],
+): CanvasDraftNode[] {
+  const nodeIds = new Set(nodes.map((n) => n.id))
+  const adjacency = new Map<string, string[]>()
+  for (const edge of edges) {
+    if (!nodeIds.has(edge.fromId) || !nodeIds.has(edge.toId)) continue
+    ;(adjacency.get(edge.fromId) ?? adjacency.set(edge.fromId, []).get(edge.fromId)!).push(edge.toId)
+    ;(adjacency.get(edge.toId) ?? adjacency.set(edge.toId, []).get(edge.toId)!).push(edge.fromId)
+  }
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const seen = new Set<string>()
+  const stack = [startId]
+  const group: CanvasDraftNode[] = []
+  while (stack.length > 0) {
+    const id = stack.pop() as string
+    if (seen.has(id)) continue
+    seen.add(id)
+    const node = byId.get(id)
+    if (!node) continue
+    group.push(node)
+    for (const neighbour of adjacency.get(id) ?? []) if (!seen.has(neighbour)) stack.push(neighbour)
+  }
+  return group
+}
+
 /**
- * Görsel Planlama Kanvası: bir hayat alanının tüm işlerini (3 Yıl'dan Saat'e, sabit ölçek
- * "swimlane"leri halinde) TEK, sürekli bir zaman ekseninde gösterir. Harita gibi zoom/pan
- * edilir — ayrı bir ölçek sekmesi ya da "içine gir" adımı yoktur, zoom'un kendisi derinliği
- * belirler. Sürükle-bağla ile FS/SS/FF/SF bağımlılığı kurulur, sürükleyerek zaman değişir
- * (kilitli değilse), kutu üzerinden "planı parçala" tetiklenir. Bkz. `lib/canvasLayout.ts`.
+ * Görsel Planlama Kanvası ("task-organizer-kanvas"): bir hayat alanının (ya da bir işin
+ * alt-kanvasının) taslak görev zincirini kurduğunuz ve gerçek işlere kilitlediğiniz alan.
+ * Üstte taslak şerit (havuzdan sürüklenen, henüz tarihe bağlanmamış, kanvasa sabit kutucuklar);
+ * altta, aynı sürekli zaman ekseninde, kilitli/gerçek işlerin zaman çizelgesi. Bkz.
+ * `lib/canvasLayout.ts` (saf zoom/pan/lane hesapları) ve `services/repositories/canvasDraftsRepository.ts`.
  */
 export function PlanningCanvas({ areaId }: { areaId: string }) {
   const uid = useUid()
   const settings = useSettingsStore((s) => s.settings)
-  const { tasks, index } = useTaskHierarchy()
+  const area = useLifeAreasStore((s) => s.areas.find((a) => a.id === areaId))
+  const areaColor = area?.color ?? DEFAULT_AREA_COLOR
+  const { tasks, index, children } = useTaskHierarchy()
+
+  const [stack, setStack] = useState<ContextLevel[]>([
+    { contextId: areaId, scale: 'year3', label: area?.name ?? 'Kanvas' },
+  ])
+  const currentLevel = stack[stack.length - 1]
+  const { draft, loading: draftLoading } = useCanvasDraft(uid, currentLevel.contextId)
+
   const containerRef = useRef<HTMLDivElement>(null)
   const panRef = useRef<{ clientX: number; view: DateRange } | null>(null)
   const [containerWidth, setContainerWidth] = useState(0)
   const [view, setView] = useState<DateRange | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [addScale, setAddScale] = useState<PlanningScale>('year3')
   const [showAddForm, setShowAddForm] = useState(false)
-  const [connecting, setConnecting] = useState<{
-    taskId: string
-    side: EdgeSide
-    point: Point
-  } | null>(null)
-  const [previewDeltaMs, setPreviewDeltaMs] = useState<{ taskId: string; deltaMs: number } | null>(
+  const [connecting, setConnecting] = useState<{ id: string; side: Side; point: Point } | null>(
     null,
   )
-
-  const areaTasks = useMemo(
-    () => tasks.filter((t) => effectiveLifeAreaId(t, index) === areaId),
-    [tasks, index, areaId],
+  const [poolDrag, setPoolDrag] = useState<{ item: CanvasDraftPoolItem; point: Point } | null>(
+    null,
   )
+  const [previewRealDeltaMs, setPreviewRealDeltaMs] = useState<{
+    taskId: string
+    deltaMs: number
+  } | null>(null)
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null)
+  const [editingPoolId, setEditingPoolId] = useState<string | null>(null)
+
+  const realTasks: Task[] = useMemo(() => {
+    if (!currentLevel.parentTaskId) {
+      return tasks.filter((t) => t.scale === 'year3' && !t.parentTaskId && t.lifeAreaId === areaId)
+    }
+    return children.get(currentLevel.parentTaskId) ?? []
+  }, [tasks, children, currentLevel, areaId])
+
   const bounds = useMemo(() => {
-    const range = boundingRange(areaTasks)
+    const range = boundingRange(realTasks)
     if (range) return range
     const now = new Date()
     const fallbackEnd = new Date(now)
-    fallbackEnd.setFullYear(fallbackEnd.getFullYear() + DEFAULT_WINDOW_YEARS)
+    fallbackEnd.setFullYear(fallbackEnd.getFullYear() + YEAR3_SPAN_YEARS)
     return { start: now, end: fallbackEnd }
-  }, [areaTasks])
+  }, [realTasks])
 
   useEffect(() => {
     const el = containerRef.current
@@ -147,134 +214,306 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     return () => el.removeEventListener('wheel', handleWheel)
   }, [bounds])
 
-  // `view`, kullanıcı zoom/pan yapana kadar null'dur — o ana kadar her render'da alanın güncel
-  // sınırlarına (bounds) düşer, veri yüklendikçe otomatik genişler. Kullanıcı etkileşince kalıcı olur.
   const currentView: DateRange = view ?? bounds
 
-  const rows: RowLayout[] = PLANNING_SCALES.reduce<RowLayout[]>((acc, scale) => {
-    const items = areaTasks.filter(
-      (t) => t.scale === scale && overlapsRange(t, currentView.start, currentView.end),
-    )
-    const nodes = layoutNodes(items, currentView)
-    const laneCount = nodes.reduce((max, n) => Math.max(max, n.lane + 1), 1)
-    const height = laneCount * LANE_HEIGHT_PX
-    const previous = acc[acc.length - 1]
-    const top = previous ? previous.top + previous.height : 0
-    return [...acc, { scale, nodes, top, height }]
-  }, [])
-  const totalHeight = rows.reduce((sum, r) => sum + r.height, 0)
-
-  const nodeByTaskId = new Map<string, { node: CanvasNode; top: number }>()
-  for (const row of rows) {
-    for (const node of row.nodes) nodeByTaskId.set(node.task.id, { node, top: row.top })
+  function persistDraft(next: CanvasDraft) {
+    void saveCanvasDraft(uid, currentLevel.contextId, next)
   }
 
-  function nodeCenter(taskId: string, side: EdgeSide): Point | null {
-    const entry = nodeByTaskId.get(taskId)
-    if (!entry) return null
-    const ratio = side === 'start' ? entry.node.left : entry.node.left + entry.node.width
-    return {
-      x: ratio * containerWidth,
-      y: entry.top + entry.node.lane * LANE_HEIGHT_PX + NODE_TOP_OFFSET_PX + NODE_HEIGHT_PX / 2,
-    }
+  // ---- havuz ----
+  function addPoolItem(title: string, hours: number, accentColor: string) {
+    persistDraft({
+      ...draft,
+      pool: [...draft.pool, { id: newTaskId(uid), title, hours, accentColor }],
+    })
+  }
+  function removePoolItem(id: string) {
+    persistDraft({ ...draft, pool: draft.pool.filter((p) => p.id !== id) })
+  }
+  function updatePoolItem(id: string, fields: Partial<CanvasDraftPoolItem>) {
+    persistDraft({
+      ...draft,
+      pool: draft.pool.map((p) => (p.id === id ? { ...p, ...fields } : p)),
+    })
   }
 
-  function commitConnection(
-    predecessorId: string,
-    successorId: string,
-    sides: { fromSide: EdgeSide; toSide: EdgeSide },
-  ) {
-    const successor = index.get(successorId)
-    if (!successor) return
-    const check = checkDependencyLink(tasks, predecessorId, successorId)
-    if (!check.ok) {
-      setError(check.reason)
+  // ---- taslak düğümler ----
+  function updateDraftNode(id: string, fields: Partial<CanvasDraftNode>) {
+    persistDraft({
+      ...draft,
+      nodes: draft.nodes.map((n) => (n.id === id ? { ...n, ...fields } : n)),
+    })
+  }
+  function removeDraftNode(id: string) {
+    persistDraft({
+      ...draft,
+      nodes: draft.nodes.filter((n) => n.id !== id),
+      edges: draft.edges.filter((e) => e.fromId !== id && e.toId !== id),
+    })
+  }
+
+  // ---- konum çözümleme (taslak + gerçek işler tek pist üzerinde) ----
+  const realLayout = useMemo(() => layoutNodes(realTasks, currentView), [realTasks, currentView])
+  const realLaneCount = realLayout.reduce((max, n) => Math.max(max, n.lane + 1), 1)
+  const realZoneTop = DRAFT_ZONE_HEIGHT_PX + ZONE_GAP_PX
+  const totalHeight = realZoneTop + realLaneCount * LANE_HEIGHT_PX
+
+  interface Resolved {
+    x: number
+    width: number
+    y: number
+  }
+  const resolvedById = new Map<string, Resolved>()
+  for (const node of draft.nodes) {
+    resolvedById.set(node.id, {
+      x: node.x,
+      width: Math.max(
+        MIN_NODE_WIDTH_PX,
+        (node.hours * HOUR_MS) /
+          ((currentView.end.getTime() - currentView.start.getTime()) / Math.max(containerWidth, 1)),
+      ),
+      y: Math.min(node.y, DRAFT_ZONE_HEIGHT_PX - NODE_HEIGHT_PX),
+    })
+  }
+  for (const rn of realLayout) {
+    resolvedById.set(rn.task.id, {
+      x: rn.left * containerWidth,
+      width: rn.width * containerWidth,
+      y: realZoneTop + rn.lane * LANE_HEIGHT_PX + NODE_TOP_OFFSET_PX,
+    })
+  }
+
+  function portPoint(id: string, side: Side): Point | null {
+    const r = resolvedById.get(id)
+    if (!r) return null
+    return { x: r.x + (side === 'right' ? r.width : 0), y: r.y + NODE_HEIGHT_PX / 2 }
+  }
+
+  // ---- bağlantı kurma ----
+  function commitConnection(fromId: string, fromSide: Side, toId: string, toSide: Side) {
+    if (fromId === toId) return
+    const fromIsReal = realTasks.some((t) => t.id === fromId)
+    const toIsReal = realTasks.some((t) => t.id === toId)
+    if (fromIsReal && toIsReal) {
+      const successor = index.get(toId)
+      if (!successor) return
+      const check = checkDependencyLink(tasks, fromId, toId)
+      if (!check.ok) {
+        setError(check.reason)
+        return
+      }
+      const type = inferDependencyType(toLibSide(fromSide), toLibSide(toSide))
+      void updateTaskDependencies(uid, toId, withDependency(successor, fromId, type))
+      setError(null)
       return
     }
-    const type = inferDependencyType(sides.fromSide, sides.toSide)
-    void updateTaskDependencies(uid, successorId, withDependency(successor, predecessorId, type))
-    if (settings.canvas.soundEnabled) playConnectSound()
+    const exists = draft.edges.some(
+      (e) => e.fromId === fromId && e.toId === toId && e.fromSide === fromSide && e.toSide === toSide,
+    )
+    if (exists) return
+    persistDraft({
+      ...draft,
+      edges: [...draft.edges, { fromId, toId, fromSide, toSide }],
+    })
     setError(null)
   }
 
-  function handleHandlePointerDown(
-    e: ReactPointerEvent<HTMLButtonElement>,
-    taskId: string,
-    side: EdgeSide,
-  ) {
+  function handlePortPointerDown(e: ReactPointerEvent<HTMLButtonElement>, id: string, side: Side) {
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return
-    setConnecting({ taskId, side, point: { x: e.clientX - rect.left, y: e.clientY - rect.top } })
+    setConnecting({ id, side, point: { x: e.clientX - rect.left, y: e.clientY - rect.top } })
   }
-
-  function handleHandlePointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
+  function handlePortPointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
     if (!connecting) return
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return
     setConnecting({ ...connecting, point: { x: e.clientX - rect.left, y: e.clientY - rect.top } })
   }
-
-  function handleHandlePointerUp(e: ReactPointerEvent<HTMLButtonElement>) {
+  function handlePortPointerUp(e: ReactPointerEvent<HTMLButtonElement>) {
     if (!connecting) return
     const target = document.elementFromPoint(e.clientX, e.clientY)
-    const targetEl = target?.closest<HTMLElement>('[data-canvas-task-id]')
+    const targetEl = target?.closest<HTMLElement>('[data-canvas-id]')
     setConnecting(null)
-    if (!targetEl) return
-    const targetId = targetEl.dataset.canvasTaskId
-    if (!targetId || targetId === connecting.taskId) return
+    if (!targetEl?.dataset.canvasId) return
+    const targetId = targetEl.dataset.canvasId
+    if (targetId === connecting.id) return
     const targetRect = targetEl.getBoundingClientRect()
-    const toSide: EdgeSide = e.clientX - targetRect.left < targetRect.width / 2 ? 'start' : 'end'
-    commitConnection(connecting.taskId, targetId, { fromSide: connecting.side, toSide })
+    const toSide: Side = e.clientX - targetRect.left < targetRect.width / 2 ? 'left' : 'right'
+    commitConnection(connecting.id, connecting.side, targetId, toSide)
   }
 
-  function handleBodyPointerDown(e: ReactPointerEvent<HTMLDivElement>, task: Task) {
-    if (task.scaleLocked) return
+  // ---- taslak düğümü sürükleme (bağlı kilitsiz zincir birlikte, kanvasta piksel olarak) ----
+  function handleDraftBodyPointerDown(e: ReactPointerEvent<HTMLDivElement>, node: CanvasDraftNode) {
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
-    e.currentTarget.dataset.dragStartX = String(e.clientX)
-    setPreviewDeltaMs({ taskId: task.id, deltaMs: 0 })
+    const startClientX = e.clientX
+    const startClientY = e.clientY
+    const group = connectedDraftGroup(node.id, draft.nodes, draft.edges).map((n) => ({
+      id: n.id,
+      startX: n.x,
+      startY: n.y,
+    }))
+    let latest = draft
+    function onMove(ev: PointerEvent) {
+      const deltaX = ev.clientX - startClientX
+      const deltaY = ev.clientY - startClientY
+      latest = {
+        ...latest,
+        nodes: latest.nodes.map((n) => {
+          const g = group.find((x) => x.id === n.id)
+          if (!g) return n
+          return {
+            ...n,
+            x: g.startX + deltaX,
+            y: Math.min(Math.max(0, g.startY + deltaY), DRAFT_ZONE_HEIGHT_PX - NODE_HEIGHT_PX),
+          }
+        }),
+      }
+      persistDraft(latest)
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 
-  function handleBodyPointerMove(e: ReactPointerEvent<HTMLDivElement>, task: Task) {
-    if (!previewDeltaMs || previewDeltaMs.taskId !== task.id || containerWidth === 0) return
-    const startX = Number(e.currentTarget.dataset.dragStartX ?? e.clientX)
-    const deltaPx = e.clientX - startX
+  // ---- gerçek işi sürükleyerek yeniden zamanlama (önizleme; bırakınca kaydedilir) ----
+  function handleRealBodyPointerDown(e: ReactPointerEvent<HTMLDivElement>, task: Task) {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const startClientX = e.clientX
     const durationMs = currentView.end.getTime() - currentView.start.getTime()
-    setPreviewDeltaMs({ taskId: task.id, deltaMs: (deltaPx / containerWidth) * durationMs })
+    const mpp = containerWidth > 0 ? durationMs / containerWidth : 0
+    setPreviewRealDeltaMs({ taskId: task.id, deltaMs: 0 })
+    function onMove(ev: PointerEvent) {
+      setPreviewRealDeltaMs({ taskId: task.id, deltaMs: (ev.clientX - startClientX) * mpp })
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setPreviewRealDeltaMs((prev) => {
+        if (prev && Math.abs(prev.deltaMs) >= 1) {
+          const newStart = new Date(new Date(task.startAt).getTime() + prev.deltaMs)
+          const newEnd = new Date(new Date(task.endAt).getTime() + prev.deltaMs)
+          void updateTaskFields(uid, task.id, {
+            startAt: newStart.toISOString(),
+            endAt: newEnd.toISOString(),
+          })
+        }
+        return null
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 
-  function handleBodyPointerUp(task: Task) {
-    if (!previewDeltaMs || previewDeltaMs.taskId !== task.id) return
-    const deltaMs = previewDeltaMs.deltaMs
-    setPreviewDeltaMs(null)
-    if (Math.abs(deltaMs) < 1) return
-    const newStart = new Date(new Date(task.startAt).getTime() + deltaMs)
-    const newEnd = new Date(new Date(task.endAt).getTime() + deltaMs)
-    void updateTaskFields(uid, task.id, {
-      startAt: newStart.toISOString(),
-      endAt: newEnd.toISOString(),
-    })
+  // ---- havuzdan kanvasa sürükle (snap yok) ----
+  function handlePoolPointerDown(e: ReactPointerEvent<HTMLElement>, item: CanvasDraftPoolItem) {
+    e.preventDefault()
+    setPoolDrag({ item, point: { x: e.clientX, y: e.clientY } })
+    function onMove(ev: PointerEvent) {
+      setPoolDrag({ item, point: { x: ev.clientX, y: ev.clientY } })
+    }
+    function onUp(ev: PointerEvent) {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      const rect = containerRef.current?.getBoundingClientRect()
+      setPoolDrag(null)
+      if (!rect) return
+      const overCanvas =
+        ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom
+      if (!overCanvas) return
+      const x = ev.clientX - rect.left - GHOST_HALF_WIDTH_PX
+      const y = Math.min(Math.max(0, ev.clientY - rect.top - NODE_HEIGHT_PX / 2), DRAFT_ZONE_HEIGHT_PX - NODE_HEIGHT_PX)
+      persistDraft({
+        pool: draft.pool.filter((p) => p.id !== item.id),
+        nodes: [...draft.nodes, { id: item.id, title: item.title, hours: item.hours, x, y, accentColor: item.accentColor }],
+        edges: draft.edges,
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 
+  // ---- pan (boşluğu sürükle) ----
   function handleContainerPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return
     e.currentTarget.setPointerCapture(e.pointerId)
     panRef.current = { clientX: e.clientX, view: currentView }
   }
-
   function handleContainerPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (!panRef.current || containerWidth === 0) return
     const { clientX, view: startView } = panRef.current
-    const deltaPx = e.clientX - clientX
-    const durationMs = startView.end.getTime() - startView.start.getTime()
-    const deltaMs = -(deltaPx / containerWidth) * durationMs
+    const deltaMs = (-(e.clientX - clientX) * (startView.end.getTime() - startView.start.getTime())) / containerWidth
     setView(panView(startView, deltaMs, bounds))
   }
-
   function handleContainerPointerUp() {
     panRef.current = null
+  }
+
+  // ---- kilitle: taslağı gerçek bir işe dönüştürür ----
+  async function lockDraftNode(node: CanvasDraftNode) {
+    const startAt = new Date(currentView.start.getTime() + (node.x / Math.max(containerWidth, 1)) * (currentView.end.getTime() - currentView.start.getTime()))
+    const endAt = new Date(startAt.getTime() + node.hours * HOUR_MS)
+    const id = newTaskId(uid)
+    const newTask: Task = {
+      id,
+      title: node.title,
+      scale: currentLevel.scale,
+      startAt: startAt.toISOString(),
+      endAt: endAt.toISOString(),
+      parentTaskId: currentLevel.parentTaskId,
+      lifeAreaId: currentLevel.parentTaskId ? undefined : areaId,
+      status: 'planned',
+      dependencies: [],
+      bufferMinutes: 0,
+      detailLevel: 'detailed',
+      accentColor: node.accentColor,
+    }
+
+    // Bu taslağa değen kenarları çöz: karşı taraf gerçek bir işse hemen bağımlılığa dönüştür,
+    // hâlâ taslaksa kenarı yeni gerçek id'yle güncelleyip taslakta bırak (o taraf kilitlenince tamamlanır).
+    const remainingEdges: CanvasDraftEdge[] = []
+    for (const edge of draft.edges) {
+      const touches = edge.fromId === node.id || edge.toId === node.id
+      if (!touches) {
+        remainingEdges.push(edge)
+        continue
+      }
+      const otherId = edge.fromId === node.id ? edge.toId : edge.fromId
+      const otherIsReal = realTasks.some((t) => t.id === otherId)
+      if (otherIsReal) {
+        const predecessorId = edge.fromId === node.id ? id : otherId
+        const successorId = edge.fromId === node.id ? otherId : id
+        const successorTask = successorId === id ? newTask : index.get(successorId)
+        if (successorTask) {
+          const type = inferDependencyType(toLibSide(edge.fromSide), toLibSide(edge.toSide))
+          if (successorId === id) {
+            newTask.dependencies = withDependency(newTask, predecessorId, type)
+          } else {
+            void updateTaskDependencies(uid, successorId, withDependency(successorTask, predecessorId, type))
+          }
+        }
+      } else {
+        remainingEdges.push({
+          fromId: edge.fromId === node.id ? id : edge.fromId,
+          toId: edge.toId === node.id ? id : edge.toId,
+          fromSide: edge.fromSide,
+          toSide: edge.toSide,
+        })
+      }
+    }
+
+    await createTasksBatch(uid, [newTask])
+    persistDraft({
+      pool: draft.pool,
+      nodes: draft.nodes.filter((n) => n.id !== node.id),
+      edges: remainingEdges,
+    })
   }
 
   async function handleBreakdown(task: Task) {
@@ -294,6 +533,17 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     await createTasksBatch(uid, drafts)
   }
 
+  function enterSubCanvas(task: Task) {
+    const childScale = finerScale(task.scale)
+    if (!childScale || childScale === 'hour') return
+    setStack((s) => [...s, { contextId: task.id, scale: childScale, parentTaskId: task.id, label: task.title }])
+    setView(null)
+  }
+  function exitToLevel(i: number) {
+    setStack((s) => s.slice(0, i + 1))
+    setView(null)
+  }
+
   function zoomByButton(factor: number) {
     setView((v) => zoomView(v ?? bounds, CENTER_RATIO, factor, MIN_VIEW_DURATION_MS, bounds))
   }
@@ -304,7 +554,27 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-text-secondary">
+          {stack.map((level, i) => (
+            <span key={level.contextId} className="flex items-center gap-1">
+              {i > 0 && <span>›</span>}
+              {i === stack.length - 1 ? (
+                <span className="font-semibold text-text">{level.label}</span>
+              ) : (
+                <button type="button" onClick={() => exitToLevel(i)} className="hover:text-text">
+                  {level.label}
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
         <div className="flex items-center gap-1">
+          {stack.length > 1 && (
+            <Button variant="ghost" size="sm" onClick={() => exitToLevel(stack.length - 2)}>
+              <ArrowLeft size={ICON_SIZE} />
+              Yukarı çık
+            </Button>
+          )}
           <Button variant="secondary" size="sm" onClick={() => zoomByButton(BUTTON_ZOOM_OUT_FACTOR)}>
             <ZoomOut size={ICON_SIZE} />
           </Button>
@@ -316,210 +586,581 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
             Tümünü gör
           </Button>
         </div>
-        <div className="flex items-center gap-1">
-          <select
-            value={addScale}
-            onChange={(e) => setAddScale(e.target.value as PlanningScale)}
-            className="rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text"
-            aria-label="Eklenecek işin ölçeği"
-          >
-            {PLANNING_SCALES.map((s) => (
-              <option key={s} value={s}>
-                {PLANNING_SCALE_LABELS[s]}
-              </option>
-            ))}
-          </select>
-          <Button variant="primary" size="sm" onClick={() => setShowAddForm((v) => !v)}>
-            <Plus size={ICON_SIZE} />
-            İş ekle
-          </Button>
-        </div>
       </div>
 
       {error && (
-        <p
-          role="status"
-          className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs text-text"
-        >
+        <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs text-text">
           {error}
         </p>
       )}
 
-      {showAddForm && (
-        <GoalForm
-          uid={uid}
-          scale={addScale}
-          defaultLifeAreaId={areaId}
-          defaultRange={currentView}
-          onDone={() => setShowAddForm(false)}
-        />
-      )}
+      <PoolPanel
+        pool={draft.pool}
+        loading={draftLoading}
+        areaColor={areaColor}
+        editingPoolId={editingPoolId}
+        showAddForm={showAddForm}
+        onToggleAddForm={() => setShowAddForm((v) => !v)}
+        onAdd={(title, hours, accentColor) => {
+          addPoolItem(title, hours, accentColor)
+          setShowAddForm(false)
+        }}
+        onStartEdit={setEditingPoolId}
+        onCancelEdit={() => setEditingPoolId(null)}
+        onSaveEdit={(id, fields) => {
+          updatePoolItem(id, fields)
+          setEditingPoolId(null)
+        }}
+        onRemove={removePoolItem}
+        onPointerDownItem={handlePoolPointerDown}
+      />
 
-      {areaTasks.length === 0 ? (
-        <EmptyState
-          icon={Shapes}
-          title="Bu hayat alanında henüz iş yok"
-          description="Yukarıdaki 'İş ekle' ile bir 3 Yıllık hedef oluşturarak başlayabilirsin."
-        />
-      ) : (
-        <div className="flex">
-          <div className="flex shrink-0 flex-col" style={{ width: LABEL_COLUMN_PX }}>
-            {rows.map((row) => (
-              <div
-                key={row.scale}
-                className="flex items-start px-1 pt-1 text-[0.65rem] font-medium uppercase tracking-wide text-text-secondary"
-                style={{ height: row.height }}
-              >
-                {PLANNING_SCALE_LABELS[row.scale]}
-              </div>
-            ))}
-          </div>
+      <div
+        ref={containerRef}
+        onPointerDown={handleContainerPointerDown}
+        onPointerMove={handleContainerPointerMove}
+        onPointerUp={handleContainerPointerUp}
+        className="relative cursor-grab overflow-hidden rounded-lg border border-border bg-bg/40 active:cursor-grabbing"
+        style={{ height: totalHeight }}
+      >
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 border-b border-dashed border-border/70 bg-bg/20"
+          style={{ height: DRAFT_ZONE_HEIGHT_PX }}
+        >
+          <span className="absolute left-2 top-1 text-[0.65rem] uppercase tracking-wide text-text-secondary">
+            Taslaklar (henüz tarihe bağlı değil)
+          </span>
+        </div>
 
+        {showNow && (
           <div
-            ref={containerRef}
-            onPointerDown={handleContainerPointerDown}
-            onPointerMove={handleContainerPointerMove}
-            onPointerUp={handleContainerPointerUp}
-            className="relative flex-1 cursor-grab overflow-hidden rounded-lg border border-border bg-bg/40 active:cursor-grabbing"
-            style={{ height: totalHeight }}
-          >
-            {rows.slice(1).map((row) => (
-              <div
-                key={row.scale}
-                aria-hidden
-                className="absolute inset-x-0 border-t border-border/60"
-                style={{ top: row.top }}
+            aria-hidden
+            className="absolute inset-y-0 border-l border-dashed border-primary/50"
+            style={{ left: `${nowRatio * PERCENT}%` }}
+          />
+        )}
+
+        <svg className="pointer-events-none absolute inset-0 h-full w-full">
+          <defs>
+            <marker id="canvas-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" className="fill-text-secondary" />
+            </marker>
+          </defs>
+          {draft.edges.map((edge) => {
+            const from = portPoint(edge.fromId, edge.fromSide)
+            const to = portPoint(edge.toId, edge.toSide)
+            if (!from || !to) return null
+            return (
+              <path
+                key={`${edge.fromId}-${edge.toId}`}
+                d={curvePath(from, to)}
+                className="fill-none stroke-text-secondary"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+                markerEnd="url(#canvas-arrow)"
               />
-            ))}
-
-            {showNow && (
-              <div
-                aria-hidden
-                className="absolute inset-y-0 border-l border-dashed border-primary/50"
-                style={{ left: `${nowRatio * PERCENT}%` }}
-              />
-            )}
-
-            <svg className="pointer-events-none absolute inset-0 h-full w-full">
-              <defs>
-                <marker id="canvas-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                  <path d="M0,0 L8,4 L0,8 Z" className="fill-text-secondary" />
-                </marker>
-              </defs>
-              {areaTasks.flatMap((task) =>
-                task.dependencies
-                  .map((dep) => {
-                    const sides = dependencyEdgeSides(dep.type)
-                    const from = nodeCenter(dep.taskId, sides.fromSide)
-                    const to = nodeCenter(task.id, sides.toSide)
-                    if (!from || !to) return null
-                    return (
-                      <path
-                        key={`${dep.taskId}-${task.id}`}
-                        d={curvePath(from, to)}
-                        className="fill-none stroke-text-secondary"
-                        strokeWidth={1.5}
-                        markerEnd="url(#canvas-arrow)"
-                      />
-                    )
-                  })
-                  .filter(Boolean),
-              )}
-              {connecting &&
-                (() => {
-                  const from = nodeCenter(connecting.taskId, connecting.side)
-                  if (!from) return null
-                  return (
-                    <path
-                      d={curvePath(from, connecting.point)}
-                      className="fill-none stroke-primary"
-                      strokeWidth={2}
-                      strokeDasharray="4 3"
-                    />
-                  )
-                })()}
-            </svg>
-
-            {rows.map((row) =>
-              row.nodes.map((node) => {
-                const task = node.task
-                const preview = previewDeltaMs?.taskId === task.id ? previewDeltaMs.deltaMs : 0
-                const previewRatio = containerWidth > 0 ? preview / containerWidth : 0
-                const canBreakDown = task.status !== 'done' && BREAKDOWN_SCALES.includes(task.scale)
+            )
+          })}
+          {realTasks.flatMap((task) =>
+            task.dependencies
+              .map((dep) => {
+                const sides = dependencyEdgeSides(dep.type)
+                const from = portPoint(dep.taskId, sides.fromSide === 'start' ? 'left' : 'right')
+                const to = portPoint(task.id, sides.toSide === 'start' ? 'left' : 'right')
+                if (!from || !to) return null
                 return (
-                  <div
-                    key={task.id}
-                    data-canvas-task-id={task.id}
-                    onPointerDown={(e) => handleBodyPointerDown(e, task)}
-                    onPointerMove={(e) => handleBodyPointerMove(e, task)}
-                    onPointerUp={() => handleBodyPointerUp(task)}
-                    className={`group absolute flex flex-col justify-center overflow-hidden rounded-md border px-2 py-1 text-xs shadow-sm ${
-                      task.status === 'done'
-                        ? 'border-success/40 bg-success/15 text-text-secondary line-through'
-                        : 'border-primary/40 bg-primary/15 text-text'
-                    } ${task.scaleLocked ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
-                    style={{
-                      left: `${(node.left + previewRatio) * PERCENT}%`,
-                      width: `${node.width * PERCENT}%`,
-                      top: row.top + node.lane * LANE_HEIGHT_PX + NODE_TOP_OFFSET_PX,
-                      height: NODE_HEIGHT_PX,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      aria-label={`${task.title}: öncül olarak bağlamak için sürükle (başlangıç kenarı)`}
-                      onPointerDown={(e) => handleHandlePointerDown(e, task.id, 'start')}
-                      onPointerMove={handleHandlePointerMove}
-                      onPointerUp={handleHandlePointerUp}
-                      className="absolute -left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-primary bg-surface opacity-0 group-hover:opacity-100"
-                      style={{ width: HANDLE_SIZE_PX, height: HANDLE_SIZE_PX }}
-                    />
-                    <button
-                      type="button"
-                      aria-label={`${task.title}: öncül olarak bağlamak için sürükle (bitiş kenarı)`}
-                      onPointerDown={(e) => handleHandlePointerDown(e, task.id, 'end')}
-                      onPointerMove={handleHandlePointerMove}
-                      onPointerUp={handleHandlePointerUp}
-                      className="absolute -right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-primary bg-surface opacity-0 group-hover:opacity-100"
-                      style={{ width: HANDLE_SIZE_PX, height: HANDLE_SIZE_PX }}
-                    />
-
-                    <span className="truncate font-medium">{task.title}</span>
-                    <span className="truncate text-[0.65rem] text-text-secondary">
-                      {format(new Date(task.startAt), 'd MMM', { locale: tr })}
-                    </span>
-
-                    <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
-                      <button
-                        type="button"
-                        onClick={() => void updateTaskLock(uid, task.id, !task.scaleLocked)}
-                        aria-label={
-                          task.scaleLocked ? `${task.title}: kilidi aç` : `${task.title}: kilitle`
-                        }
-                        title={task.scaleLocked ? 'Kilidi aç' : 'Kilitle (zamanı sabitle)'}
-                        className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
-                      >
-                        {task.scaleLocked ? <Lock size={ICON_SIZE} /> : <Unlock size={ICON_SIZE} />}
-                      </button>
-                      {canBreakDown && (
-                        <button
-                          type="button"
-                          onClick={() => void handleBreakdown(task)}
-                          aria-label={`${task.title}: planı parçala`}
-                          title="Planı parçala (alt dönemlere böl)"
-                          className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
-                        >
-                          <GitBranchPlus size={ICON_SIZE} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  <path
+                    key={`${dep.taskId}-${task.id}`}
+                    d={curvePath(from, to)}
+                    className="fill-none stroke-text-secondary"
+                    strokeWidth={1.5}
+                    markerEnd="url(#canvas-arrow)"
+                  />
                 )
-              }),
-            )}
+              })
+              .filter(Boolean),
+          )}
+          {connecting &&
+            (() => {
+              const from = portPoint(connecting.id, connecting.side)
+              if (!from) return null
+              return (
+                <path
+                  d={curvePath(from, connecting.point)}
+                  className="fill-none stroke-primary"
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                />
+              )
+            })()}
+        </svg>
+
+        {draft.nodes.map((node) => {
+          if (editingDraftId === node.id) {
+            return (
+              <DraftEditForm
+                key={node.id}
+                node={node}
+                resolved={resolvedById.get(node.id)}
+                onCancel={() => setEditingDraftId(null)}
+                onSave={(fields) => {
+                  updateDraftNode(node.id, fields)
+                  setEditingDraftId(null)
+                }}
+              />
+            )
+          }
+          const r = resolvedById.get(node.id)
+          if (!r) return null
+          return (
+            <div
+              key={node.id}
+              data-canvas-id={node.id}
+              onPointerDown={(e) => handleDraftBodyPointerDown(e, node)}
+              className="group absolute flex cursor-grab flex-col justify-center overflow-hidden rounded-md border border-dashed border-text-secondary/50 px-2 py-1 text-xs text-text shadow-sm active:cursor-grabbing"
+              style={{
+                left: r.x,
+                top: r.y,
+                width: r.width,
+                height: NODE_HEIGHT_PX,
+                background: twoTone(areaColor, node.accentColor ?? DEFAULT_ACCENT_COLOR),
+              }}
+            >
+              <NodePorts id={node.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
+              <span className="truncate font-medium">{node.title}</span>
+              <span className="truncate text-[0.65rem]">{node.hours}s · taslak</span>
+              <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEditingDraftId(node.id)
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label={`${node.title}: düzenle`}
+                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void lockDraftNode(node)
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label={`${node.title}: kilitle (${format(new Date(currentView.start.getTime() + (node.x / Math.max(containerWidth, 1)) * (currentView.end.getTime() - currentView.start.getTime())), 'd MMM', { locale: tr })} tarihine)`}
+                  title="Kilitle: o an cetvelin altındaki tarihe bağla, gerçek bir işe dönüştür"
+                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+                >
+                  <Lock size={ICON_SIZE} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeDraftNode(node.id)
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label={`${node.title}: sil`}
+                  className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-danger"
+                >
+                  <X size={ICON_SIZE} />
+                </button>
+              </div>
+            </div>
+          )
+        })}
+
+        {realLayout.map(({ task }) => {
+          const r = resolvedById.get(task.id)
+          if (!r) return null
+          const preview = previewRealDeltaMs?.taskId === task.id ? previewRealDeltaMs.deltaMs : 0
+          const previewPx = containerWidth > 0 ? preview : 0
+          const now = new Date()
+          const isActiveNow = now >= new Date(task.startAt) && now < new Date(task.endAt)
+          const canBreakDown = task.status !== 'done' && BREAKDOWN_SCALES.includes(task.scale)
+          const canOpen = finerScale(task.scale) !== null && finerScale(task.scale) !== 'hour'
+          return (
+            <div
+              key={task.id}
+              data-canvas-id={task.id}
+              onPointerDown={(e) => handleRealBodyPointerDown(e, task)}
+              className={`group absolute flex cursor-grab flex-col justify-center overflow-hidden rounded-md border px-2 py-1 text-xs text-text shadow-sm active:cursor-grabbing ${
+                task.status === 'done' ? 'border-success/50 opacity-70 line-through' : 'border-primary/40'
+              } ${isActiveNow ? 'active-now-pulse' : ''}`}
+              style={{
+                left: r.x + previewPx,
+                top: r.y,
+                width: r.width,
+                height: NODE_HEIGHT_PX,
+                background: twoTone(areaColor, task.accentColor ?? DEFAULT_ACCENT_COLOR),
+              }}
+            >
+              <NodePorts id={task.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
+              <span className="truncate font-medium">{task.title}</span>
+              <span className="truncate text-[0.65rem]">
+                {PLANNING_SCALE_LABELS[task.scale]} · {format(new Date(task.startAt), 'd MMM', { locale: tr })}
+              </span>
+              <div className="absolute right-0.5 top-0.5 hidden gap-0.5 group-hover:flex">
+                {canBreakDown && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void handleBreakdown(task)
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label={`${task.title}: planı parçala`}
+                    title="Planı parçala (alt dönemlere böl)"
+                    className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+                  >
+                    <GitBranchPlus size={ICON_SIZE} />
+                  </button>
+                )}
+                {canOpen && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      enterSubCanvas(task)
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label={`${task.title}: içine gir`}
+                    title="İçine gir (alt-kanvas)"
+                    className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-primary"
+                  >
+                    <Maximize size={ICON_SIZE} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {realTasks.length === 0 && draft.nodes.length === 0 && draft.pool.length === 0 && !draftLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <EmptyState
+              icon={Shapes}
+              title="Bu bölümde henüz iş yok"
+              description="Yukarıdan bir görev ekleyip aşağıdaki zaman şeridine sürükleyin, kilitleyin."
+            />
           </div>
+        )}
+      </div>
+
+      {poolDrag && (
+        <div
+          className="pointer-events-none fixed z-50 flex flex-col justify-center rounded-md border border-dashed px-2 py-1 text-xs text-text shadow-lg"
+          style={{
+            left: poolDrag.point.x - GHOST_HALF_WIDTH_PX,
+            top: poolDrag.point.y - NODE_HEIGHT_PX / 2,
+            width: GHOST_WIDTH_PX,
+            height: NODE_HEIGHT_PX,
+            background: twoTone(areaColor, poolDrag.item.accentColor ?? DEFAULT_ACCENT_COLOR),
+          }}
+        >
+          <span className="truncate font-medium">{poolDrag.item.title}</span>
+          <span className="text-[0.65rem]">{poolDrag.item.hours}s</span>
         </div>
       )}
     </div>
+  )
+}
+
+function NodePorts({
+  id,
+  onPortDown,
+  onPortMove,
+  onPortUp,
+}: {
+  id: string
+  onPortDown: (e: ReactPointerEvent<HTMLButtonElement>, id: string, side: Side) => void
+  onPortMove: (e: ReactPointerEvent<HTMLButtonElement>) => void
+  onPortUp: (e: ReactPointerEvent<HTMLButtonElement>) => void
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Öncül olarak bağlamak için sürükle (başlangıç kenarı)"
+        onPointerDown={(e) => onPortDown(e, id, 'left')}
+        onPointerMove={onPortMove}
+        onPointerUp={onPortUp}
+        className="absolute -left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-primary bg-surface opacity-0 group-hover:opacity-100"
+        style={{ width: HANDLE_SIZE_PX, height: HANDLE_SIZE_PX }}
+      />
+      <button
+        type="button"
+        aria-label="Öncül olarak bağlamak için sürükle (bitiş kenarı)"
+        onPointerDown={(e) => onPortDown(e, id, 'right')}
+        onPointerMove={onPortMove}
+        onPointerUp={onPortUp}
+        className="absolute -right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-primary bg-surface opacity-0 group-hover:opacity-100"
+        style={{ width: HANDLE_SIZE_PX, height: HANDLE_SIZE_PX }}
+      />
+    </>
+  )
+}
+
+function PoolPanel({
+  pool,
+  loading,
+  areaColor,
+  editingPoolId,
+  showAddForm,
+  onToggleAddForm,
+  onAdd,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onRemove,
+  onPointerDownItem,
+}: {
+  pool: CanvasDraftPoolItem[]
+  loading: boolean
+  areaColor: string
+  editingPoolId: string | null
+  showAddForm: boolean
+  onToggleAddForm: () => void
+  onAdd: (title: string, hours: number, accentColor: string) => void
+  onStartEdit: (id: string) => void
+  onCancelEdit: () => void
+  onSaveEdit: (id: string, fields: Partial<CanvasDraftPoolItem>) => void
+  onRemove: (id: string) => void
+  onPointerDownItem: (e: ReactPointerEvent<HTMLElement>, item: CanvasDraftPoolItem) => void
+}) {
+  const [title, setTitle] = useState('')
+  const [hours, setHours] = useState(String(DEFAULT_HOURS))
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (showAddForm) titleInputRef.current?.focus()
+  }, [showAddForm])
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg/40 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Havuz</h3>
+        <Button variant="ghost" size="sm" onClick={onToggleAddForm}>
+          <Plus size={ICON_SIZE} />
+          Havuza ekle
+        </Button>
+      </div>
+
+      {showAddForm && (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const trimmed = title.trim()
+            if (!trimmed) return
+            onAdd(trimmed, Number(hours) || DEFAULT_HOURS, accentColor)
+            setTitle('')
+            setHours(String(DEFAULT_HOURS))
+          }}
+        >
+          <input
+            ref={titleInputRef}
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Görev adı"
+            className="min-w-[10rem] flex-1 rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text"
+          />
+          <input
+            type="number"
+            min={0.5}
+            step={0.5}
+            required
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            aria-label="Süre (saat)"
+            className="w-20 rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text"
+          />
+          <input
+            type="color"
+            value={accentColor}
+            onChange={(e) => setAccentColor(e.target.value)}
+            title="Bu görev için renk"
+            className="h-8 w-9 cursor-pointer rounded border border-border bg-bg p-0.5"
+          />
+          <Button type="submit" variant="primary" size="sm">
+            Ekle
+          </Button>
+        </form>
+      )}
+
+      {pool.length === 0 && !loading ? (
+        <p className="text-xs text-text-secondary">
+          Havuz boş. Yukarıdan bir görev ekleyip aşağıdaki kanvasa sürükleyin.
+        </p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {pool.map((item) =>
+            editingPoolId === item.id ? (
+              <PoolEditForm key={item.id} item={item} onCancel={onCancelEdit} onSave={onSaveEdit} />
+            ) : (
+              <li
+                key={item.id}
+                onPointerDown={(e) => onPointerDownItem(e, item)}
+                className="group flex cursor-grab items-center gap-1.5 rounded-lg border border-dashed border-text-secondary/50 px-2 py-1 text-xs text-text active:cursor-grabbing"
+                style={{ background: twoTone(areaColor, item.accentColor ?? DEFAULT_ACCENT_COLOR) }}
+              >
+                <span className="font-medium">{item.title}</span>
+                <span className="opacity-80">{item.hours}s</span>
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => onStartEdit(item.id)}
+                  aria-label={`${item.title}: düzenle`}
+                  className="ml-1 hidden rounded bg-surface p-0.5 text-text-secondary group-hover:block"
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => onRemove(item.id)}
+                  aria-label={`${item.title}: sil`}
+                  className="hidden rounded bg-surface p-0.5 text-text-secondary group-hover:block"
+                >
+                  <Trash2 size={ICON_SIZE} />
+                </button>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function PoolEditForm({
+  item,
+  onCancel,
+  onSave,
+}: {
+  item: CanvasDraftPoolItem
+  onCancel: () => void
+  onSave: (id: string, fields: Partial<CanvasDraftPoolItem>) => void
+}) {
+  const [title, setTitle] = useState(item.title)
+  const [hours, setHours] = useState(String(item.hours))
+  const [accentColor, setAccentColor] = useState(item.accentColor ?? DEFAULT_ACCENT_COLOR)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    titleInputRef.current?.focus()
+  }, [])
+
+  return (
+    <li>
+      <form
+        className="flex items-center gap-1 rounded-lg border border-primary/50 bg-surface p-1.5"
+        onSubmit={(e) => {
+          e.preventDefault()
+          onSave(item.id, { title: title.trim() || item.title, hours: Number(hours) || item.hours, accentColor })
+        }}
+      >
+        <input
+          ref={titleInputRef}
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-24 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+        />
+        <input
+          type="number"
+          min={0.5}
+          step={0.5}
+          required
+          value={hours}
+          onChange={(e) => setHours(e.target.value)}
+          className="w-14 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+        />
+        <input
+          type="color"
+          value={accentColor}
+          onChange={(e) => setAccentColor(e.target.value)}
+          className="h-7 w-8 cursor-pointer rounded border border-border bg-bg p-0.5"
+        />
+        <button type="submit" className="rounded p-1 text-primary hover:bg-primary/10">
+          ✓
+        </button>
+        <button type="button" onClick={onCancel} className="rounded p-1 text-text-secondary hover:bg-border/60">
+          <X size={ICON_SIZE} />
+        </button>
+      </form>
+    </li>
+  )
+}
+
+function DraftEditForm({
+  node,
+  resolved,
+  onCancel,
+  onSave,
+}: {
+  node: CanvasDraftNode
+  resolved?: { x: number; y: number; width: number }
+  onCancel: () => void
+  onSave: (fields: Partial<CanvasDraftNode>) => void
+}) {
+  const [title, setTitle] = useState(node.title)
+  const [hours, setHours] = useState(String(node.hours))
+  const [accentColor, setAccentColor] = useState(node.accentColor ?? DEFAULT_ACCENT_COLOR)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    titleInputRef.current?.focus()
+  }, [])
+
+  return (
+    <form
+      onPointerDown={(e) => e.stopPropagation()}
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSave({ title: title.trim() || node.title, hours: Number(hours) || node.hours, accentColor })
+      }}
+      className="absolute z-20 flex w-48 flex-col gap-1.5 rounded-md border border-primary bg-surface p-2 text-xs shadow-lg"
+      style={{ left: resolved?.x ?? node.x, top: resolved?.y ?? node.y }}
+    >
+      <input
+        ref={titleInputRef}
+        required
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+      />
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          min={0.5}
+          step={0.5}
+          required
+          value={hours}
+          onChange={(e) => setHours(e.target.value)}
+          className="w-16 rounded border border-border bg-bg px-1.5 py-1 text-xs text-text"
+        />
+        <span className="text-text-secondary">saat</span>
+        <input
+          type="color"
+          value={accentColor}
+          onChange={(e) => setAccentColor(e.target.value)}
+          className="ml-auto h-6 w-7 cursor-pointer rounded border border-border bg-bg p-0.5"
+        />
+      </div>
+      <div className="flex justify-end gap-1">
+        <button type="button" onClick={onCancel} className="rounded p-1 text-text-secondary hover:bg-border/60">
+          Vazgeç
+        </button>
+        <button type="submit" className="rounded p-1 text-primary hover:bg-primary/10">
+          Kaydet
+        </button>
+      </div>
+    </form>
   )
 }

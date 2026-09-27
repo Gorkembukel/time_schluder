@@ -87,6 +87,7 @@ export interface NewTaskInput {
   bufferMinutes: number
   detailLevel: DetailLevel
   dependencies?: TaskDependency[]
+  accentColor?: string
 }
 
 export async function createTask(uid: string, input: NewTaskInput): Promise<void> {
@@ -128,7 +129,10 @@ export async function createTasksBatch(uid: string, tasks: Task[]): Promise<void
 }
 
 export type TaskFieldsUpdate = Partial<
-  Pick<Task, 'title' | 'startAt' | 'endAt' | 'parentTaskId' | 'lifeAreaId' | 'requirementId'>
+  Pick<
+    Task,
+    'title' | 'startAt' | 'endAt' | 'parentTaskId' | 'lifeAreaId' | 'requirementId' | 'accentColor'
+  >
 > & { actualMinutes?: number | '' }
 
 /** Başlık/tarih/hiyerarşi alanlarını günceller. `undefined` alan dokunulmadan kalır; boş string (`''`) verilen bağlantı alanı (ör. parentTaskId) belgeden silinir. */
@@ -142,11 +146,6 @@ export async function updateTaskFields(
     payload[key] = value === '' ? deleteField() : value
   }
   await updateDoc(doc(db, 'users', uid, 'tasks', taskId), payload)
-}
-
-/** Görsel Planlama Kanvası'nda kilit aç/kapat — kilitliyken kanvasta sürükleyerek zamanı değiştirilemez. */
-export async function updateTaskLock(uid: string, taskId: string, locked: boolean): Promise<void> {
-  await updateDoc(doc(db, 'users', uid, 'tasks', taskId), { scaleLocked: locked })
 }
 
 export async function updateTaskDependencies(

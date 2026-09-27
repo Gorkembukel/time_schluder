@@ -4,6 +4,7 @@ import { ChevronRight, Layers, Plus, Trash2, Waypoints } from 'lucide-react'
 import {
   deleteLifeArea,
   renameLifeArea,
+  updateLifeAreaColor,
   updateLifeAreaPriority,
 } from '../../services/repositories/lifeAreasRepository'
 import {
@@ -33,6 +34,8 @@ import { Badge } from '../../components/Badge'
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text'
 const PROGRESS_MAX_PERCENT = 100
 const LOADING_ROW_COUNT = 2
+/** Rengi henüz seçilmemiş bir hayat alanı için varsayılan (nötr) renk. */
+export const DEFAULT_AREA_COLOR = '#94a3b8'
 const ICON_SIZE = 14
 /** Alt gereklilik ağacında her derinlik seviyesinin girinti miktarı (rem). */
 const DEPTH_INDENT_REM = 0.5
@@ -101,6 +104,16 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
               </option>
             ))}
           </select>
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+          Renk
+          <input
+            type="color"
+            value={area.color ?? DEFAULT_AREA_COLOR}
+            onChange={(e) => void updateLifeAreaColor(uid, area.id, e.target.value)}
+            title="Görsel Planlama Kanvası'nda bu alanın rengi"
+            className="h-7 w-9 cursor-pointer rounded border border-border bg-bg p-0.5"
+          />
         </label>
         <Button variant="secondary" size="sm" onClick={() => navigate(`/kanvas/${area.id}`)}>
           <Waypoints size={ICON_SIZE} />
