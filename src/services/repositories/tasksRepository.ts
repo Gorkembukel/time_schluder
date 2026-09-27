@@ -139,6 +139,7 @@ export type TaskFieldsUpdate = Partial<
     | 'requirementId'
     | 'accentColor'
     | 'canvasY'
+    | 'scale'
   >
 > & { actualMinutes?: number | '' }
 

@@ -131,19 +131,27 @@ describe('inferDependencyType / dependencyEdgeSides', () => {
 describe('inferScaleFromDuration', () => {
   const HOUR_MS = 3_600_000
   const DAY_MS = 24 * HOUR_MS
+  const thresholds = { year3Days: 632, yearDays: 104, monthDays: 14.5, weekDays: 2.6, dayHours: 4.9 }
 
   it('tipik süreler için beklenen ölçeği döner', () => {
-    expect(inferScaleFromDuration(3 * 365 * DAY_MS)).toBe('year3')
-    expect(inferScaleFromDuration(365 * DAY_MS)).toBe('year')
-    expect(inferScaleFromDuration(30 * DAY_MS)).toBe('month')
-    expect(inferScaleFromDuration(7 * DAY_MS)).toBe('week')
-    expect(inferScaleFromDuration(DAY_MS)).toBe('day')
-    expect(inferScaleFromDuration(2 * HOUR_MS)).toBe('hour')
+    expect(inferScaleFromDuration(3 * 365 * DAY_MS, thresholds)).toBe('year3')
+    expect(inferScaleFromDuration(365 * DAY_MS, thresholds)).toBe('year')
+    expect(inferScaleFromDuration(30 * DAY_MS, thresholds)).toBe('month')
+    expect(inferScaleFromDuration(7 * DAY_MS, thresholds)).toBe('week')
+    expect(inferScaleFromDuration(DAY_MS, thresholds)).toBe('day')
+    expect(inferScaleFromDuration(2 * HOUR_MS, thresholds)).toBe('hour')
   })
 
   it('çok kısa ve çok uzun uçlarda sınırları aşmaz', () => {
-    expect(inferScaleFromDuration(0)).toBe('hour')
-    expect(inferScaleFromDuration(100 * 365 * DAY_MS)).toBe('year3')
+    expect(inferScaleFromDuration(0, thresholds)).toBe('hour')
+    expect(inferScaleFromDuration(100 * 365 * DAY_MS, thresholds)).toBe('year3')
+  })
+
+  it('eşikler değiştirilince farklı ölçek dönebilir', () => {
+    const thirtyHours = 30 * HOUR_MS
+    expect(inferScaleFromDuration(thirtyHours, thresholds)).toBe('day')
+    const stricterThresholds = { ...thresholds, dayHours: 40 }
+    expect(inferScaleFromDuration(thirtyHours, stricterThresholds)).toBe('hour')
   })
 })
 

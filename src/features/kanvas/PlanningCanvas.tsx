@@ -12,9 +12,12 @@ import {
   GitBranchPlus,
   Lock,
   Maximize,
+  Maximize2,
+  Minimize2,
   Plus,
   Shapes,
   Trash2,
+  Undo2,
   X,
   ZoomIn,
   ZoomOut,
@@ -96,6 +99,8 @@ const NODE_HEIGHT_PX = 44
 const NODE_TOP_OFFSET_PX = (LANE_HEIGHT_PX - NODE_HEIGHT_PX) / 2
 const CURVE_OFFSET_PX = 36
 const HANDLE_SIZE_PX = 10
+/** Bağlantı çizgisine tıklayarak kaldırmak için görünmez, geniş bir "hit" alanı — ince çizgiye tam isabet gerektirmesin. */
+const EDGE_HIT_WIDTH_PX = 14
 const ICON_SIZE = 14
 const DEFAULT_ACCENT_COLOR = '#f5a524'
 const DEFAULT_HOURS = 4
@@ -104,8 +109,10 @@ const GHOST_WIDTH_PX = 90
 const GHOST_HALF_WIDTH_PX = GHOST_WIDTH_PX / 2
 const MILESTONE_SIZE_PX = 18
 const MILESTONE_DURATION_MS = 60_000
+const MIN_RESIZE_HOURS = 0.25
 const CANVAS_GAP_PX = 16
 const MIN_CANVAS_HEIGHT_PX = 240
+const EXPANDED_MIN_CANVAS_HEIGHT_PX = 640
 
 function curvePath(from: Point, to: Point): string {
   return `M ${from.x},${from.y} C ${from.x + CURVE_OFFSET_PX},${from.y} ${to.x - CURVE_OFFSET_PX},${to.y} ${to.x},${to.y}`
@@ -194,8 +201,13 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     deltaMs: number
     y: number
   } | null>(null)
+  const [previewResizeDeltaMs, setPreviewResizeDeltaMs] = useState<{
+    taskId: string
+    deltaMs: number
+  } | null>(null)
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null)
   const [editingPoolId, setEditingPoolId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
 
   const realTasks: Task[] = useMemo(() => {
     // Ölçek artık süreden çıkarıldığı için kök seviyedeki işler tek bir ölçeğe (year3) bağlı
@@ -292,12 +304,27 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
       nodes: draft.nodes.map((n) => (n.id === id ? { ...n, ...fields } : n)),
     })
   }
-  function removeDraftNode(id: string) {
+  /** Kanvastan kaldırma = silme değil, havuza geri dönüş — bağlantıları da (yanlışlıkla kurulmuş olabilir) temizler. */
+  function returnDraftNodeToPool(id: string) {
+    const node = draft.nodes.find((n) => n.id === id)
+    if (!node) return
     persistDraft({
-      ...draft,
+      pool: [...draft.pool, { id: node.id, title: node.title, hours: node.hours, accentColor: node.accentColor, kind: node.kind }],
       nodes: draft.nodes.filter((n) => n.id !== id),
       edges: draft.edges.filter((e) => e.fromId !== id && e.toId !== id),
     })
+  }
+
+  /** Bir bağlantıyı kaldırır — taslak-taslak kenarıysa taslaktan, gerçek bir bağımlılıksa Task.dependencies'ten. */
+  function removeDraftEdge(edge: CanvasDraftEdge) {
+    persistDraft({ ...draft, edges: draft.edges.filter((e) => e !== edge) })
+  }
+  function removeRealDependency(successor: Task, predecessorId: string) {
+    void updateTaskDependencies(
+      uid,
+      successor.id,
+      successor.dependencies.filter((d) => d.taskId !== predecessorId),
+    )
   }
 
   // ---- konum çözümleme: taslaklar ve gerçek işler AYNI serbest kanvasta (artifact'teki gibi) ----
@@ -493,6 +520,62 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     window.addEventListener('pointerup', onUp)
   }
 
+  // ---- taslak kutucuğu sağ kenarından yatayda boyutlandırma: süre (ve dolayısıyla ölçek) canlı değişir ----
+  function handleDraftResizePointerDown(e: ReactPointerEvent<HTMLDivElement>, node: CanvasDraftNode) {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const startClientX = e.clientX
+    const startHours = node.hours
+    const durationMs = currentView.end.getTime() - currentView.start.getTime()
+    const mpp = containerWidth > 0 ? durationMs / containerWidth : 0
+    let latest = draft
+    function onMove(ev: PointerEvent) {
+      const deltaHours = ((ev.clientX - startClientX) * mpp) / HOUR_MS
+      const hours = Math.max(MIN_RESIZE_HOURS, startHours + deltaHours)
+      latest = {
+        ...latest,
+        nodes: latest.nodes.map((n) => (n.id === node.id ? { ...n, hours } : n)),
+      }
+      persistDraft(latest)
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  // ---- gerçek işi sağ kenarından boyutlandırma: bitiş tarihi ve buna bağlı ölçek güncellenir ----
+  function handleRealResizePointerDown(e: ReactPointerEvent<HTMLDivElement>, task: Task) {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const startClientX = e.clientX
+    const durationMs = currentView.end.getTime() - currentView.start.getTime()
+    const mpp = containerWidth > 0 ? durationMs / containerWidth : 0
+    setPreviewResizeDeltaMs({ taskId: task.id, deltaMs: 0 })
+    function onMove(ev: PointerEvent) {
+      setPreviewResizeDeltaMs({ taskId: task.id, deltaMs: (ev.clientX - startClientX) * mpp })
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setPreviewResizeDeltaMs((prev) => {
+        if (prev && Math.abs(prev.deltaMs) >= 1) {
+          const start = new Date(task.startAt)
+          const minEnd = new Date(start.getTime() + MIN_RESIZE_HOURS * HOUR_MS)
+          const requestedEnd = new Date(new Date(task.endAt).getTime() + prev.deltaMs)
+          const end = requestedEnd < minEnd ? minEnd : requestedEnd
+          const scale = inferScaleFromDuration(end.getTime() - start.getTime(), settings.canvas.scaleThresholds)
+          void updateTaskFields(uid, task.id, { endAt: end.toISOString(), scale })
+        }
+        return null
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
   // ---- havuzdan kanvasa sürükle (snap yok) ----
   function handlePoolPointerDown(e: ReactPointerEvent<HTMLElement>, item: CanvasDraftPoolItem) {
     e.preventDefault()
@@ -547,7 +630,9 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     const endAt = new Date(startAt.getTime() + (isMilestone ? MILESTONE_DURATION_MS : node.hours * HOUR_MS))
     // Kilometre taşının süresi yok — bulunduğu kanvas seviyesine (bağlama) aittir. Görevin ölçeği
     // ise hangi derinlikte oluşturulduğundan bağımsız, kendi süresinden çıkarılır.
-    const scale = isMilestone ? currentLevel.scale : inferScaleFromDuration(node.hours * HOUR_MS)
+    const scale = isMilestone
+      ? currentLevel.scale
+      : inferScaleFromDuration(node.hours * HOUR_MS, settings.canvas.scaleThresholds)
     const id = newTaskId(uid)
     const newTask: Task = {
       id,
@@ -643,7 +728,13 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   const showNow = new Date() >= currentView.start && new Date() <= currentView.end
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
+    <div
+      className={
+        expanded
+          ? 'fixed inset-4 z-50 flex flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-2xl'
+          : 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm'
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-text-secondary">
           {stack.map((level, i) => (
@@ -675,6 +766,10 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
           <Button variant="ghost" size="sm" onClick={() => setView(bounds)}>
             <Maximize size={ICON_SIZE} />
             Tümünü gör
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setExpanded((v) => !v)}>
+            {expanded ? <Minimize2 size={ICON_SIZE} /> : <Maximize2 size={ICON_SIZE} />}
+            {expanded ? 'Küçült' : 'Büyüt'}
           </Button>
         </div>
       </div>
@@ -712,7 +807,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
         onPointerMove={handleContainerPointerMove}
         onPointerUp={handleContainerPointerUp}
         className="relative cursor-grab overflow-hidden rounded-lg border border-border bg-bg/40 active:cursor-grabbing"
-        style={{ height: totalHeight }}
+        style={{ height: expanded ? Math.max(totalHeight, EXPANDED_MIN_CANVAS_HEIGHT_PX) : totalHeight }}
       >
         {gridLinesInView.map((line) => (
           <div
@@ -745,15 +840,26 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
             const from = portPoint(edge.fromId, edge.fromSide)
             const to = portPoint(edge.toId, edge.toSide)
             if (!from || !to) return null
+            const d = curvePath(from, to)
             return (
-              <path
-                key={`${edge.fromId}-${edge.toId}`}
-                d={curvePath(from, to)}
-                className="fill-none stroke-text-secondary"
-                strokeWidth={1.5}
-                strokeDasharray="3 3"
-                markerEnd="url(#canvas-arrow)"
-              />
+              <g key={`${edge.fromId}-${edge.toId}`} className="group">
+                <path
+                  d={d}
+                  stroke="transparent"
+                  strokeWidth={EDGE_HIT_WIDTH_PX}
+                  className="pointer-events-auto cursor-pointer"
+                  onClick={() => removeDraftEdge(edge)}
+                >
+                  <title>Bağlantıyı kaldır</title>
+                </path>
+                <path
+                  d={d}
+                  className="pointer-events-none fill-none stroke-text-secondary transition-colors group-hover:stroke-danger"
+                  strokeWidth={1.5}
+                  strokeDasharray="3 3"
+                  markerEnd="url(#canvas-arrow)"
+                />
+              </g>
             )
           })}
           {realTasks.flatMap((task) =>
@@ -763,14 +869,25 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
                 const from = portPoint(dep.taskId, sides.fromSide === 'start' ? 'left' : 'right')
                 const to = portPoint(task.id, sides.toSide === 'start' ? 'left' : 'right')
                 if (!from || !to) return null
+                const d = curvePath(from, to)
                 return (
-                  <path
-                    key={`${dep.taskId}-${task.id}`}
-                    d={curvePath(from, to)}
-                    className="fill-none stroke-text-secondary"
-                    strokeWidth={1.5}
-                    markerEnd="url(#canvas-arrow)"
-                  />
+                  <g key={`${dep.taskId}-${task.id}`} className="group">
+                    <path
+                      d={d}
+                      stroke="transparent"
+                      strokeWidth={EDGE_HIT_WIDTH_PX}
+                      className="pointer-events-auto cursor-pointer"
+                      onClick={() => removeRealDependency(task, dep.taskId)}
+                    >
+                      <title>Bağlantıyı kaldır</title>
+                    </path>
+                    <path
+                      d={d}
+                      className="pointer-events-none fill-none stroke-text-secondary transition-colors group-hover:stroke-danger"
+                      strokeWidth={1.5}
+                      markerEnd="url(#canvas-arrow)"
+                    />
+                  </g>
                 )
               })
               .filter(Boolean),
@@ -849,13 +966,14 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  removeDraftNode(node.id)
+                  returnDraftNodeToPool(node.id)
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
-                aria-label={`${node.title}: sil`}
+                aria-label={`${node.title}: havuza döndür`}
+                title="Kanvastan kaldır, havuza geri döndür"
                 className="rounded bg-surface p-0.5 text-text-secondary shadow-sm hover:text-danger"
               >
-                <X size={ICON_SIZE} />
+                <Undo2 size={ICON_SIZE} />
               </button>
             </div>
           )
@@ -898,7 +1016,20 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
             >
               <NodePorts id={node.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
               <span className="truncate font-medium">{node.title}</span>
-              <span className="truncate text-[0.65rem]">{node.hours}s · taslak</span>
+              <span className="truncate text-[0.65rem]">
+                {node.hours.toFixed(2).replace(/\.?0+$/, '')}s ·{' '}
+                {
+                  PLANNING_SCALE_LABELS[
+                    inferScaleFromDuration(node.hours * HOUR_MS, settings.canvas.scaleThresholds)
+                  ]
+                }
+              </span>
+              <div
+                role="separator"
+                aria-label={`${node.title}: süreyi (ve ölçeği) değiştirmek için sağa/sola sürükle`}
+                onPointerDown={(e) => handleDraftResizePointerDown(e, node)}
+                className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize hover:bg-primary/40"
+              />
               {actions}
             </div>
           )
@@ -911,6 +1042,8 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
           const previewing = previewRealDeltaMs?.taskId === task.id
           const previewPx = previewing && containerWidth > 0 ? previewRealDeltaMs.deltaMs : 0
           const topPx = previewing ? previewRealDeltaMs.y : r.y
+          const resizingPx =
+            previewResizeDeltaMs?.taskId === task.id && containerWidth > 0 ? previewResizeDeltaMs.deltaMs : 0
           const now = new Date()
           const isActiveNow = now >= new Date(task.startAt) && now < new Date(task.endAt)
           const canBreakDown = !isMilestone && task.status !== 'done' && BREAKDOWN_SCALES.includes(task.scale)
@@ -987,7 +1120,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
               style={{
                 left: r.x + previewPx,
                 top: topPx,
-                width: r.width,
+                width: Math.max(MIN_NODE_WIDTH_PX, r.width + resizingPx),
                 height: NODE_HEIGHT_PX,
                 background,
               }}
@@ -995,6 +1128,12 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
               <NodePorts id={task.id} onPortDown={handlePortPointerDown} onPortMove={handlePortPointerMove} onPortUp={handlePortPointerUp} />
               <span className="truncate font-medium">{task.title}</span>
               <span className="truncate text-[0.65rem]">{metaText}</span>
+              <div
+                role="separator"
+                aria-label={`${task.title}: bitiş süresini (ve ölçeği) değiştirmek için sağa/sola sürükle`}
+                onPointerDown={(e) => handleRealResizePointerDown(e, task)}
+                className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize hover:bg-primary/40"
+              />
               {actions}
             </div>
           )

@@ -120,25 +120,30 @@ const HOURS_PER_DAY = 24
 const HOUR_MS = 3_600_000
 const DAY_MS = HOURS_PER_DAY * HOUR_MS
 
-// Eşikler, bitişik ölçeklerin tipik sürelerinin (yıl3=1095g, yıl=365g, ay=30g, hafta=7g, gün=1g,
-// saat=1g/24) geometrik ortalamasıdır — ör. yıl3 ve yıl arası √(1095×365)≈632g.
-const YEAR3_THRESHOLD_DAYS = 632
-const YEAR_THRESHOLD_DAYS = 104
-const MONTH_THRESHOLD_DAYS = 14.5
-const WEEK_THRESHOLD_DAYS = 2.6
-const DAY_THRESHOLD_HOURS = 4.9
+/**
+ * Bitişik ölçeklerin tipik sürelerinin (yıl3=1095g, yıl=365g, ay=30g, hafta=7g, gün=1g, saat=1g/24)
+ * geometrik ortalaması gibi düşünülebilecek eşikler — ör. yıl3 ve yıl arası √(1095×365)≈632g.
+ * Varsayılan değerleri `config/constants.ts`te; kullanıcı Ayarlar'dan değiştirebilir.
+ */
+export interface ScaleThresholds {
+  year3Days: number
+  yearDays: number
+  monthDays: number
+  weekDays: number
+  dayHours: number
+}
 
 /**
  * Bir sürenin (ms) hangi 3 yıl/yıl/ay/hafta/gün/saat ölçeğine en yakın olduğunu çıkarır.
- * Görsel Planlama Kanvası'nda kilitlenen bir görevin ölçeğini, hangi kanvas derinliğinde
- * oluşturulduğundan bağımsız olarak, kendi süresinden belirler.
+ * Görsel Planlama Kanvası'nda bir görev kutucuğu yatayda sürüklenip boyutlandırıldıkça,
+ * kapladığı süreye göre ölçeği bu eşiklerle canlı olarak yeniden hesaplanır.
  */
-export function inferScaleFromDuration(durationMs: number): PlanningScale {
-  if (durationMs >= YEAR3_THRESHOLD_DAYS * DAY_MS) return 'year3'
-  if (durationMs >= YEAR_THRESHOLD_DAYS * DAY_MS) return 'year'
-  if (durationMs >= MONTH_THRESHOLD_DAYS * DAY_MS) return 'month'
-  if (durationMs >= WEEK_THRESHOLD_DAYS * DAY_MS) return 'week'
-  if (durationMs >= DAY_THRESHOLD_HOURS * HOUR_MS) return 'day'
+export function inferScaleFromDuration(durationMs: number, thresholds: ScaleThresholds): PlanningScale {
+  if (durationMs >= thresholds.year3Days * DAY_MS) return 'year3'
+  if (durationMs >= thresholds.yearDays * DAY_MS) return 'year'
+  if (durationMs >= thresholds.monthDays * DAY_MS) return 'month'
+  if (durationMs >= thresholds.weekDays * DAY_MS) return 'week'
+  if (durationMs >= thresholds.dayHours * HOUR_MS) return 'day'
   return 'hour'
 }
 

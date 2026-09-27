@@ -37,6 +37,16 @@ const PRIORITY_WEIGHT_STEP = 0.5
 const BLOCK_MINUTES_MIN = 15
 const BLOCK_MINUTES_STEP = 15
 const UPCOMING_WINDOW_MIN = 1
+const SCALE_THRESHOLD_MIN = 0
+const SCALE_THRESHOLD_STEP = 0.1
+
+const CANVAS_THRESHOLD_FIELDS = [
+  { key: 'year3Days', label: '3 Yıl eşiği (gün)' },
+  { key: 'yearDays', label: 'Yıl eşiği (gün)' },
+  { key: 'monthDays', label: 'Ay eşiği (gün)' },
+  { key: 'weekDays', label: 'Hafta eşiği (gün)' },
+  { key: 'dayHours', label: 'Gün eşiği (saat)' },
+] as const
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -285,9 +295,33 @@ export function AyarlarPage() {
           <input
             type="checkbox"
             checked={settings.canvas.soundEnabled}
-            onChange={(e) => void update({ canvas: { soundEnabled: e.target.checked } })}
+            onChange={(e) =>
+              void update({ canvas: { ...settings.canvas, soundEnabled: e.target.checked } })
+            }
           />
         </Field>
+        {CANVAS_THRESHOLD_FIELDS.map(({ key, label }) => (
+          <Field key={key} label={label}>
+            <input
+              type="number"
+              min={SCALE_THRESHOLD_MIN}
+              step={SCALE_THRESHOLD_STEP}
+              className={inputClass}
+              value={settings.canvas.scaleThresholds[key]}
+              onChange={(e) =>
+                void update({
+                  canvas: {
+                    ...settings.canvas,
+                    scaleThresholds: {
+                      ...settings.canvas.scaleThresholds,
+                      [key]: Number(e.target.value),
+                    },
+                  },
+                })
+              }
+            />
+          </Field>
+        ))}
       </Section>
 
       <Section title="Görünüm & Tema">
