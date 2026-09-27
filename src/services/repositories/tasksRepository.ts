@@ -144,6 +144,11 @@ export async function updateTaskFields(
   await updateDoc(doc(db, 'users', uid, 'tasks', taskId), payload)
 }
 
+/** Görsel Planlama Kanvası'nda kilit aç/kapat — kilitliyken kanvasta sürükleyerek zamanı değiştirilemez. */
+export async function updateTaskLock(uid: string, taskId: string, locked: boolean): Promise<void> {
+  await updateDoc(doc(db, 'users', uid, 'tasks', taskId), { scaleLocked: locked })
+}
+
 export async function updateTaskDependencies(
   uid: string,
   taskId: string,

@@ -280,6 +280,16 @@ export function AyarlarPage() {
         ))}
       </Section>
 
+      <Section title="Görsel Planlama Kanvası">
+        <Field label="Bağlantı kurulunca ses çal">
+          <input
+            type="checkbox"
+            checked={settings.canvas.soundEnabled}
+            onChange={(e) => void update({ canvas: { soundEnabled: e.target.checked } })}
+          />
+        </Field>
+      </Section>
+
       <Section title="Görünüm & Tema">
         <Field label="Tema">
           <select

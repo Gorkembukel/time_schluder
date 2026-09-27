@@ -48,6 +48,10 @@ export interface Settings {
     /** Genel Bakış'taki "yaklaşan görevler" listesinin kaç gün ileriyi kapsayacağı. */
     upcomingWindowDays: number
   }
+  canvas: {
+    /** Görsel Planlama Kanvası'nda bağlantı kurulunca ses çalınsın mı. */
+    soundEnabled: boolean
+  }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -90,5 +94,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   dashboard: {
     upcomingWindowDays: 7,
+  },
+  canvas: {
+    soundEnabled: true,
   },
 }

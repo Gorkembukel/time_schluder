@@ -3,16 +3,18 @@ import { addDays, addMonths, addWeeks, addYears, format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { scalePeriodRange, YEAR3_SPAN_YEARS } from '../../lib/planning-engine'
+import { coarserScale, finerScale, scalePeriodRange, YEAR3_SPAN_YEARS } from '../../lib/planning-engine'
 import { PageHeader } from '../../components/PageHeader'
 import { Button } from '../../components/Button'
 import { DayAgenda } from './DayAgenda'
 import { WeekView } from './WeekView'
 import { MonthView } from './MonthView'
-import { HorizonBoard } from './HorizonBoard'
+import { HorizonBoard, type HorizonScale } from './HorizonBoard'
+import { PlanningCanvas } from './PlanningCanvas'
 import { GuidancePanel } from '../rehber/GuidancePanel'
 
 type ViewMode = 'day' | 'week' | 'month' | 'year' | 'year3'
+type DisplayMode = 'liste' | 'kanvas'
 
 const VIEW_LABELS: Record<ViewMode, string> = {
   day: 'Gün',
@@ -53,6 +55,8 @@ export function TakvimPage() {
   const weekStartsOn = useSettingsStore((s) => s.settings.calendarTime.weekStartsOn)
   const [view, setView] = useState<ViewMode>('week')
   const [referenceDate, setReferenceDate] = useState(new Date())
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('liste')
+  const showCanvasToggle = view !== 'day'
 
   const subtitle =
     view === 'year' || view === 'year3'
@@ -83,6 +87,24 @@ export function TakvimPage() {
                 </button>
               ))}
             </div>
+            {showCanvasToggle && (
+              <div className="flex gap-1 rounded-full border border-border bg-surface p-1">
+                {(['liste', 'kanvas'] as DisplayMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setDisplayMode(mode)}
+                    className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                      displayMode === mode
+                        ? 'bg-primary text-primary-text'
+                        : 'text-text-secondary hover:text-text'
+                    }`}
+                  >
+                    {mode === 'liste' ? 'Liste' : 'Kanvas'}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex gap-1">
               <Button
                 variant="secondary"
@@ -116,10 +138,27 @@ export function TakvimPage() {
       )}
 
       {view === 'day' && <DayAgenda date={referenceDate} />}
-      {view === 'week' && (
+
+      {view !== 'day' && displayMode === 'kanvas' && (
+        <PlanningCanvas
+          scale={view as HorizonScale}
+          referenceDate={referenceDate}
+          weekStartsOn={weekStartsOn}
+          onZoomIn={() => {
+            const finer = finerScale(view)
+            if (finer && finer !== 'hour') setView(finer as ViewMode)
+          }}
+          onZoomOut={() => {
+            const coarser = coarserScale(view)
+            if (coarser) setView(coarser as ViewMode)
+          }}
+        />
+      )}
+
+      {view === 'week' && displayMode === 'liste' && (
         <HorizonBoard scale="week" referenceDate={referenceDate} weekStartsOn={weekStartsOn} />
       )}
-      {view === 'week' && (
+      {view === 'week' && displayMode === 'liste' && (
         <WeekView
           referenceDate={referenceDate}
           weekStartsOn={weekStartsOn}
@@ -129,10 +168,10 @@ export function TakvimPage() {
           }}
         />
       )}
-      {view === 'month' && (
+      {view === 'month' && displayMode === 'liste' && (
         <HorizonBoard scale="month" referenceDate={referenceDate} weekStartsOn={weekStartsOn} />
       )}
-      {view === 'month' && (
+      {view === 'month' && displayMode === 'liste' && (
         <MonthView
           referenceDate={referenceDate}
           weekStartsOn={weekStartsOn}
@@ -142,7 +181,7 @@ export function TakvimPage() {
           }}
         />
       )}
-      {(view === 'year' || view === 'year3') && (
+      {(view === 'year' || view === 'year3') && displayMode === 'liste' && (
         <HorizonBoard scale={view} referenceDate={referenceDate} weekStartsOn={weekStartsOn} />
       )}
     </div>
