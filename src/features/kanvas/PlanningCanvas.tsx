@@ -37,6 +37,7 @@ import { checkDependencyLink, withDependency } from '../../lib/dependencyLinking
 import {
   boundingRange,
   dependencyEdgeSides,
+  gridLines,
   inferDependencyType,
   inferScaleFromDuration,
   layoutNodes,
@@ -44,6 +45,7 @@ import {
   timeRatio,
   zoomView,
   type EdgeSide as LibEdgeSide,
+  type GridLine,
 } from '../../lib/canvasLayout'
 import type { DateRange } from '../../lib/dateRange'
 import { Button } from '../../components/Button'
@@ -80,6 +82,8 @@ interface Point {
 
 const HOUR_MS = 3_600_000
 const MIN_VIEW_DURATION_MS = 2 * HOUR_MS
+/** Zoom/pan'ın izin verdiği "şimdi"nin her iki yönündeki asgari genişlik — az veri varken bile serbestçe gezinilebilsin. */
+const WORLD_SPAN_YEARS = 10
 const WHEEL_ZOOM_IN_FACTOR = 0.87
 const WHEEL_ZOOM_OUT_FACTOR = 1 / WHEEL_ZOOM_IN_FACTOR
 const BUTTON_ZOOM_IN_FACTOR = 0.6
@@ -109,6 +113,20 @@ function curvePath(from: Point, to: Point): string {
 
 function twoTone(areaColor: string, accentColor: string): string {
   return `linear-gradient(135deg, ${areaColor} 50%, ${accentColor} 50%)`
+}
+
+function gridLabel(line: GridLine): string {
+  switch (line.unit) {
+    case 'year':
+      return format(line.date, 'yyyy')
+    case 'month':
+      return format(line.date, 'LLL yyyy', { locale: tr })
+    case 'week':
+    case 'day':
+      return format(line.date, 'd MMM', { locale: tr })
+    case 'hour':
+      return format(line.date, 'HH:mm')
+  }
 }
 
 function connectedDraftGroup(
@@ -180,8 +198,10 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   const [editingPoolId, setEditingPoolId] = useState<string | null>(null)
 
   const realTasks: Task[] = useMemo(() => {
+    // Ölçek artık süreden çıkarıldığı için kök seviyedeki işler tek bir ölçeğe (year3) bağlı
+    // değil — hangi ölçekte kilitlenmişse o şekilde görünür.
     if (!currentLevel.parentTaskId) {
-      return tasks.filter((t) => t.scale === 'year3' && !t.parentTaskId && t.lifeAreaId === areaId)
+      return tasks.filter((t) => !t.parentTaskId && t.lifeAreaId === areaId)
     }
     return children.get(currentLevel.parentTaskId) ?? []
   }, [tasks, children, currentLevel, areaId])
@@ -189,11 +209,29 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   const bounds = useMemo(() => {
     const range = boundingRange(realTasks)
     if (range) return range
+    // Boş bir alt-kanvasta varsayılan görünüm, üst işin kendi tarih aralığı olsun (rastgele
+    // "şimdi + 3 yıl" değil) — kök kanvasta (üst iş yoksa) o varsayılana düşer.
+    const parentTask = currentLevel.parentTaskId ? index.get(currentLevel.parentTaskId) : undefined
+    if (parentTask) return { start: new Date(parentTask.startAt), end: new Date(parentTask.endAt) }
     const now = new Date()
     const fallbackEnd = new Date(now)
     fallbackEnd.setFullYear(fallbackEnd.getFullYear() + YEAR3_SPAN_YEARS)
     return { start: now, end: fallbackEnd }
-  }, [realTasks])
+  }, [realTasks, currentLevel, index])
+
+  // Zoom/pan sınırı `bounds`tan (yalnızca kilitli işler) çok daha geniş: tek bir kısa iş
+  // kilitlense bile, henüz kilitlenmemiş uzun bir taslağa ulaşmak için yeterince uzaklaşabilmelisiniz.
+  const worldBounds = useMemo(() => {
+    const now = new Date()
+    const wideStart = new Date(now)
+    wideStart.setFullYear(wideStart.getFullYear() - WORLD_SPAN_YEARS)
+    const wideEnd = new Date(now)
+    wideEnd.setFullYear(wideEnd.getFullYear() + WORLD_SPAN_YEARS)
+    return {
+      start: new Date(Math.min(wideStart.getTime(), bounds.start.getTime())),
+      end: new Date(Math.max(wideEnd.getTime(), bounds.end.getTime())),
+    }
+  }, [bounds])
 
   useEffect(() => {
     const el = containerRef.current
@@ -214,13 +252,17 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
       const rect = el!.getBoundingClientRect()
       const cursorRatio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
       const factor = e.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : WHEEL_ZOOM_OUT_FACTOR
-      setView((v) => zoomView(v ?? bounds, cursorRatio, factor, MIN_VIEW_DURATION_MS, bounds))
+      setView((v) => zoomView(v ?? bounds, cursorRatio, factor, MIN_VIEW_DURATION_MS, worldBounds))
     }
     el.addEventListener('wheel', handleWheel, { passive: false })
     return () => el.removeEventListener('wheel', handleWheel)
-  }, [bounds])
+  }, [bounds, worldBounds])
 
   const currentView: DateRange = view ?? bounds
+  const gridLinesInView = useMemo(
+    () => gridLines(currentView, settings.calendarTime.weekStartsOn),
+    [currentView, settings.calendarTime.weekStartsOn],
+  )
 
   function persistDraft(next: CanvasDraft) {
     void saveCanvasDraft(uid, currentLevel.contextId, next)
@@ -492,7 +534,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     if (!panRef.current || containerWidth === 0) return
     const { clientX, view: startView } = panRef.current
     const deltaMs = (-(e.clientX - clientX) * (startView.end.getTime() - startView.start.getTime())) / containerWidth
-    setView(panView(startView, deltaMs, bounds))
+    setView(panView(startView, deltaMs, worldBounds))
   }
   function handleContainerPointerUp() {
     panRef.current = null
@@ -584,7 +626,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
 
   function enterSubCanvas(task: Task) {
     const childScale = finerScale(task.scale)
-    if (!childScale || childScale === 'hour') return
+    if (!childScale) return
     setStack((s) => [...s, { contextId: task.id, scale: childScale, parentTaskId: task.id, label: task.title }])
     setView(null)
   }
@@ -594,7 +636,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   }
 
   function zoomByButton(factor: number) {
-    setView((v) => zoomView(v ?? bounds, CENTER_RATIO, factor, MIN_VIEW_DURATION_MS, bounds))
+    setView((v) => zoomView(v ?? bounds, CENTER_RATIO, factor, MIN_VIEW_DURATION_MS, worldBounds))
   }
 
   const nowRatio = timeRatio(new Date(), currentView)
@@ -672,6 +714,18 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
         className="relative cursor-grab overflow-hidden rounded-lg border border-border bg-bg/40 active:cursor-grabbing"
         style={{ height: totalHeight }}
       >
+        {gridLinesInView.map((line) => (
+          <div
+            key={line.date.toISOString()}
+            aria-hidden
+            className="absolute inset-y-0 border-l border-dashed border-border/70"
+            style={{ left: `${timeRatio(line.date, currentView) * PERCENT}%` }}
+          >
+            <span className="absolute top-1 left-1 whitespace-nowrap text-[0.65rem] text-text-secondary">
+              {gridLabel(line)}
+            </span>
+          </div>
+        ))}
 
         {showNow && (
           <div
@@ -860,7 +914,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
           const now = new Date()
           const isActiveNow = now >= new Date(task.startAt) && now < new Date(task.endAt)
           const canBreakDown = !isMilestone && task.status !== 'done' && BREAKDOWN_SCALES.includes(task.scale)
-          const canOpen = !isMilestone && finerScale(task.scale) !== null && finerScale(task.scale) !== 'hour'
+          const canOpen = !isMilestone && finerScale(task.scale) !== null
           const metaText = isMilestone
             ? format(new Date(task.startAt), 'd MMM', { locale: tr })
             : `${PLANNING_SCALE_LABELS[task.scale]} · ${format(new Date(task.startAt), 'd MMM', { locale: tr })}`

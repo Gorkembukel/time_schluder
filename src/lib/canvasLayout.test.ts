@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   boundingRange,
   dependencyEdgeSides,
+  gridLines,
   inferDependencyType,
   inferScaleFromDuration,
   layoutNodes,
   panView,
+  pickGridUnit,
   timeRatio,
   zoomView,
 } from './canvasLayout'
@@ -142,5 +144,26 @@ describe('inferScaleFromDuration', () => {
   it('çok kısa ve çok uzun uçlarda sınırları aşmaz', () => {
     expect(inferScaleFromDuration(0)).toBe('hour')
     expect(inferScaleFromDuration(100 * 365 * DAY_MS)).toBe('year3')
+  })
+})
+
+describe('pickGridUnit / gridLines', () => {
+  const HOUR_MS = 3_600_000
+  const DAY_MS = 24 * HOUR_MS
+
+  it('geniş aralıkta yıl, dar aralıkta saat birimini seçer', () => {
+    expect(pickGridUnit(5 * 365 * DAY_MS)).toBe('year')
+    expect(pickGridUnit(3 * HOUR_MS)).toBe('hour')
+  })
+
+  it('bir yıllık aralıkta ay çizgileri üretir ve aralığın içinde kalır', () => {
+    const period = { start: new Date(2026, 0, 1), end: new Date(2027, 0, 1) }
+    const lines = gridLines(period, 1)
+    expect(lines.length).toBeGreaterThan(0)
+    for (const line of lines) {
+      expect(line.date.getTime()).toBeGreaterThanOrEqual(period.start.getTime())
+      expect(line.date.getTime()).toBeLessThan(period.end.getTime())
+      expect(line.unit).toBe('month')
+    }
   })
 })

@@ -1,4 +1,16 @@
-import type { DateRange } from './dateRange'
+import {
+  addDays,
+  addHours,
+  addMonths,
+  addWeeks,
+  addYears,
+  startOfDay,
+  startOfHour,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+} from 'date-fns'
+import { toDateFnsWeekStartsOn, type DateRange } from './dateRange'
 import type { DependencyType, PlanningScale, Task } from '../types/domain'
 
 /**
@@ -128,6 +140,78 @@ export function inferScaleFromDuration(durationMs: number): PlanningScale {
   if (durationMs >= WEEK_THRESHOLD_DAYS * DAY_MS) return 'week'
   if (durationMs >= DAY_THRESHOLD_HOURS * HOUR_MS) return 'day'
   return 'hour'
+}
+
+export type GridUnit = 'year' | 'month' | 'week' | 'day' | 'hour'
+
+const GRID_YEAR_MIN_SPAN_DAYS = 1095
+const GRID_MONTH_MIN_SPAN_DAYS = 55
+const GRID_WEEK_MIN_SPAN_DAYS = 9
+const GRID_DAY_MIN_SPAN_HOURS = 20
+
+/** Görünür aralığın genişliğine göre en okunur kesikli-çizgi birimini seçer (yakınlaştıkça daha ince). */
+export function pickGridUnit(spanMs: number): GridUnit {
+  if (spanMs > GRID_YEAR_MIN_SPAN_DAYS * DAY_MS) return 'year'
+  if (spanMs > GRID_MONTH_MIN_SPAN_DAYS * DAY_MS) return 'month'
+  if (spanMs > GRID_WEEK_MIN_SPAN_DAYS * DAY_MS) return 'week'
+  if (spanMs > GRID_DAY_MIN_SPAN_HOURS * HOUR_MS) return 'day'
+  return 'hour'
+}
+
+function floorToGridUnit(date: Date, unit: GridUnit, weekStartsOn: number): Date {
+  switch (unit) {
+    case 'year':
+      return startOfYear(date)
+    case 'month':
+      return startOfMonth(date)
+    case 'week':
+      return startOfWeek(date, { weekStartsOn: toDateFnsWeekStartsOn(weekStartsOn) })
+    case 'day':
+      return startOfDay(date)
+    case 'hour':
+      return startOfHour(date)
+  }
+}
+
+function stepGridUnit(date: Date, unit: GridUnit): Date {
+  switch (unit) {
+    case 'year':
+      return addYears(date, 1)
+    case 'month':
+      return addMonths(date, 1)
+    case 'week':
+      return addWeeks(date, 1)
+    case 'day':
+      return addDays(date, 1)
+    case 'hour':
+      return addHours(date, 1)
+  }
+}
+
+export interface GridLine {
+  date: Date
+  unit: GridUnit
+}
+
+const GRID_LINE_GUARD_LIMIT = 1000
+
+/**
+ * Görünür aralığı kapsayan, tarihe hizalanmış referans çizgileri (yıl/ay/hafta/gün/saat sınırları)
+ * — bir grid/snap DEĞİL, yalnızca görsel referans; kutucuklar bunlara hizalanmaz.
+ */
+export function gridLines(view: DateRange, weekStartsOn: number): GridLine[] {
+  const unit = pickGridUnit(view.end.getTime() - view.start.getTime())
+  const lines: GridLine[] = []
+  let cursor = floorToGridUnit(view.start, unit, weekStartsOn)
+  let guard = 0
+  while (cursor.getTime() < view.end.getTime() && guard < GRID_LINE_GUARD_LIMIT) {
+    if (cursor.getTime() >= view.start.getTime()) lines.push({ date: cursor, unit })
+    const next = stepGridUnit(cursor, unit)
+    if (next.getTime() <= cursor.getTime()) break
+    cursor = next
+    guard += 1
+  }
+  return lines
 }
 
 export type EdgeSide = 'start' | 'end'
