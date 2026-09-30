@@ -67,6 +67,17 @@ export interface LifeArea {
   updatedAt: string
 }
 
+/** Ayarlardan düzenlenebilir — Gereklilik türünün aksine ürün kararıyla sabitlenmedi (bkz. docs/decisions/0011). */
+export const REQUIREMENT_STATUSES = ['yok', 'alinacak', 'var', 'edinildi'] as const
+export type RequirementStatus = (typeof REQUIREMENT_STATUSES)[number]
+
+export const REQUIREMENT_STATUS_LABELS: Record<RequirementStatus, string> = {
+  yok: 'Yok',
+  alinacak: 'Alınacak',
+  var: 'Var',
+  edinildi: 'Edinildi',
+}
+
 export interface Requirement {
   id: string
   lifeAreaId: string
@@ -79,6 +90,14 @@ export interface Requirement {
   parentRequirementId?: string
   /** Bu gerekliliğin ait olduğu konu (aynı hayat alanı içinde) — bkz. docs/decisions/0009. */
   topicId?: string
+  /** Envanter durumu — currentValue/targetMetric'in yerine değil yanına eklenir (bkz. docs/decisions/0011). */
+  status?: RequirementStatus
+  /** Tahmini maliyet (TRY) — planlı harcama zincirinin girdisi (bkz. docs/decisions/0012, Faz 3). */
+  estimatedCost?: number
+  /** Nereden edinilebileceğine dair link (ör. ürün sayfası). */
+  sourceUrl?: string
+  /** Bu gerekliliğin türetildiği deneyim notu — iki yönlü bağın diğer ucu KnowledgeItem.derivedRequirementIds'te. */
+  originNoteId?: string
   createdAt: string
   updatedAt: string
 }
@@ -119,6 +138,10 @@ export interface KnowledgeItem {
   topicId: string
   taskId?: string
   requirementId?: string
+  /** Deneyim/retrospektif notu işareti — "Gerekliliğe dönüştür" aksiyonu bunlarda gösterilir. */
+  isExperienceNote?: boolean
+  /** Bu nottan türetilmiş gereklilik(ler) — iki yönlü bağın diğer ucu Requirement.originNoteId'de. */
+  derivedRequirementIds?: string[]
   createdAt: string
   updatedAt: string
 }

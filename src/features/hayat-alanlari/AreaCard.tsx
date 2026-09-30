@@ -10,6 +10,7 @@ import {
 import {
   createRequirement,
   deleteRequirement,
+  updateRequirementDetails,
   updateRequirementProgress,
 } from '../../services/repositories/requirementsRepository'
 import { createTopic, deleteTopic, renameTopic } from '../../services/repositories/topicsRepository'
@@ -21,11 +22,14 @@ import { AreaGoals } from './AreaGoals'
 import {
   LIFE_AREA_PRIORITIES,
   LIFE_AREA_PRIORITY_LABELS,
+  REQUIREMENT_STATUSES,
+  REQUIREMENT_STATUS_LABELS,
   REQUIREMENT_TYPES,
   REQUIREMENT_TYPE_LABELS,
   type LifeAreaPriority,
   type LifeArea,
   type Requirement,
+  type RequirementStatus,
   type RequirementType,
   type Topic,
 } from '../../types/domain'
@@ -37,6 +41,12 @@ import { Badge } from '../../components/Badge'
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text'
 const PROGRESS_MAX_PERCENT = 100
 const LOADING_ROW_COUNT = 2
+const STATUS_BADGE_VARIANT: Record<RequirementStatus, 'danger' | 'warning' | 'success'> = {
+  yok: 'danger',
+  alinacak: 'warning',
+  var: 'success',
+  edinildi: 'success',
+}
 /** Rengi henüz seçilmemiş bir hayat alanı için varsayılan (nötr) renk. */
 export const DEFAULT_AREA_COLOR = '#94a3b8'
 const ICON_SIZE = 14
@@ -331,6 +341,11 @@ function RequirementNode({
                   {topics.find((t) => t.id === requirement.topicId)?.name ?? 'konu'}
                 </Badge>
               )}
+              {requirement.status && (
+                <Badge variant={STATUS_BADGE_VARIANT[requirement.status]}>
+                  {REQUIREMENT_STATUS_LABELS[requirement.status]}
+                </Badge>
+              )}
               {isParent && <Badge variant="primary">{kids.length} alt gereklilik</Badge>}
               {linkedTasks.length > 0 && (
                 <Badge variant="primary">
@@ -391,6 +406,58 @@ function RequirementNode({
             </>
           )}
         </div>
+        {!isParent && (
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-1 text-xs text-text-secondary">
+              Durum
+              <select
+                value={requirement.status ?? ''}
+                onChange={(e) =>
+                  void updateRequirementDetails(uid, areaId, requirement.id, {
+                    status: (e.target.value || '') as RequirementStatus | '',
+                  })
+                }
+                className="rounded-lg border border-border bg-bg px-1.5 py-0.5 text-xs text-text"
+              >
+                <option value="">—</option>
+                {REQUIREMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {REQUIREMENT_STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1 text-xs text-text-secondary">
+              Maliyet
+              <input
+                type="number"
+                min={0}
+                placeholder="TRY"
+                defaultValue={requirement.estimatedCost ?? ''}
+                onBlur={(e) =>
+                  void updateRequirementDetails(uid, areaId, requirement.id, {
+                    estimatedCost: e.target.value === '' ? '' : Number(e.target.value),
+                  })
+                }
+                className="w-20 rounded-lg border border-border bg-bg px-1.5 py-0.5 text-xs text-text"
+              />
+            </label>
+            <label className="flex items-center gap-1 text-xs text-text-secondary">
+              Kaynak link
+              <input
+                type="url"
+                placeholder="https://…"
+                defaultValue={requirement.sourceUrl ?? ''}
+                onBlur={(e) =>
+                  void updateRequirementDetails(uid, areaId, requirement.id, {
+                    sourceUrl: e.target.value.trim(),
+                  })
+                }
+                className="w-36 rounded-lg border border-border bg-bg px-1.5 py-0.5 text-xs text-text"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       {showAddChild && (

@@ -42,6 +42,7 @@ export interface NewKnowledgeItemInput {
   topicId: string
   taskId?: string
   requirementId?: string
+  isExperienceNote?: boolean
 }
 
 export async function createKnowledgeItem(
@@ -57,7 +58,7 @@ export async function createKnowledgeItem(
 }
 
 export type KnowledgeItemFieldsUpdate = Partial<
-  Pick<KnowledgeItem, 'type' | 'title' | 'body'>
+  Pick<KnowledgeItem, 'type' | 'title' | 'body' | 'isExperienceNote'>
 >
 
 export async function updateKnowledgeItem(
