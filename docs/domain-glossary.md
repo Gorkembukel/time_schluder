@@ -63,6 +63,20 @@ Jira eşlemesi (bkz. `.claude/personas/jira-developer.md`). Her iş bir üst öl
 | Gereklilik | Bir hayat alanında ilerlemek için gereken, ölçülebilir ve takip edilebilir birim |
 | Gereklilik türü | Sabit liste: Bilgi, Beceri, İlişki/Ağ, Finansal kaynak, Varlık/Araç, Belge/Yetkinlik, Alışkanlık, Sağlık/Enerji, Deneyim |
 
+## Konu ve çalışma ortamı katmanı (taslak)
+Bilgi ve kaynak katmanı tasarımı, bkz. `docs/decisions/0009`–`0013` ve `docs/bilgi-kaynak-katmani-tasarim.md`. Bu terimler henüz uygulamaya geçmedi, ADR'ler "Önerildi" durumunda.
+
+| Terim | Tanım |
+|---|---|
+| Konu | Bir hayat alanına bağlı, zamana bağlı olmayan kalıcı çalışma alanı (taslak). Epic/Story/Task zaman hiyerarşisine **dik bir bağlamdır, hiyerarşide bir seviye değildir** — Jira'daki "Component" kavramına benzer: bir işe (Task) birden çok konu etiketlenebilir, konunun kendisi zamandan bağımsızdır (bkz. ADR 0009) |
+| Çalışma ortamı | Bir konunun barındırdığı içeriğin tümü: bilgi birimleri, gerekliliklerin envanter durumu, deneyim notları, planlı harcamalar, ilgili işler (taslak) |
+| Bilgi birimi | Görev olmayan, konunun çalışma ortamında biriken kayıt: not, link, doküman, kişi, tasarım kararı; bir işe veya gerekliliğe iliştirilebilir, türleri config'de tanımlıdır (taslak, bkz. ADR 0010) |
+| Deneyim notu | Bir bilgi biriminin alt türü; bir işe bağlı veya bağımsız retrospektif kayıt; tek adımda yeni bir gerekliliğe dönüştürülebilir (türetme); kaynak not ile türeyen gereklilik arasındaki bağ iki yönlüdür (taslak, bkz. ADR 0011) |
+| Envanter durumu | Bir gerekliliğin "elimde ne var" boyutu: yok / alınacak / var / edinildi (değerler config'de); mevcut sayısal ilerleme (`currentValue`/`targetMetric`) alanının yerine değil, yanına eklenir (taslak, bkz. ADR 0011) |
+| Boşluk analizi | Bir konu veya hedef kapsamındaki, envanter durumu eksik ya da ilerlemesi düşük gerekliliklerin listelendiği görünüm (taslak) |
+| Planlı harcama | Fiyatlı (`estimatedCost`) ve durumu "alınacak" olan bir gerekliliğe bağlı, henüz gerçekleşmemiş harcama kaydı; satın alınınca bir finans işlemine dönüşür ve gerekliliğin envanter durumu için öneri üretir (taslak, bkz. ADR 0012) |
+| Çalışma ortamı şablonu | Bir konu oluşturulurken kopyalanan başlangıç bölüm/alan yapısı (ör. Müfredat, Envanter, Proje kataloğu, Boş); konuya kopyalanır (snapshot), şablon sonradan değişse mevcut konular etkilenmez (taslak, bkz. ADR 0013) |
+
 ## Finans
 | Terim | Tanım |
 |---|---|
@@ -70,3 +84,4 @@ Jira eşlemesi (bkz. `.claude/personas/jira-developer.md`). Her iş bir üst öl
 | İhtiyaç / İstek | Kategoriye ek, çapraz filtre etiketi (ayrı kategori değil) |
 | Bütçe vs. gerçekleşen | Planlanan harcama ile gerçekleşen harcamanın karşılaştırılması |
 | Referans kur snapshot'ı | İşlem girildiği andaki USD, gram altın ve BTC fiyatının işlemle birlikte kaydedilmesi — harcamanın zaman içinde bu birimler cinsinden değerini görebilmek için |
+| Planlı harcama | bkz. yukarıdaki "Konu ve çalışma ortamı katmanı" tablosu (taslak) |
