@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Layers, Plus, Trash2, Waypoints } from 'lucide-react'
+import { BookOpen, ChevronRight, Layers, Plus, Trash2 } from 'lucide-react'
 import {
   deleteLifeArea,
   renameLifeArea,
@@ -12,7 +12,9 @@ import {
   deleteRequirement,
   updateRequirementProgress,
 } from '../../services/repositories/requirementsRepository'
+import { createTopic, deleteTopic, renameTopic } from '../../services/repositories/topicsRepository'
 import { useRequirements } from '../../hooks/useRequirements'
+import { useTopics } from '../../hooks/useTopics'
 import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
 import { effectiveRequirementId } from '../../lib/taskHierarchy'
 import { AreaGoals } from './AreaGoals'
@@ -25,6 +27,7 @@ import {
   type LifeArea,
   type Requirement,
   type RequirementType,
+  type Topic,
 } from '../../types/domain'
 import { SkeletonLines } from '../../components/Skeleton'
 import { Card } from '../../components/Card'
@@ -41,14 +44,16 @@ const ICON_SIZE = 14
 const DEPTH_INDENT_REM = 0.5
 
 export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
-  const navigate = useNavigate()
   const { requirements, loading } = useRequirements(uid, area.id)
+  const { topics, loading: topicsLoading } = useTopics(uid, area.id)
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(area.name)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [showNewRequirement, setShowNewRequirement] = useState(false)
-  // Gereklilikler varsayılan olarak katlı: kart sadece hedefleri ve kısa bir özet gösterir.
+  const [showNewTopic, setShowNewTopic] = useState(false)
+  // Gereklilikler ve Konular varsayılan olarak katlı: kart sadece hedefleri ve kısa bir özet gösterir.
   const [requirementsOpen, setRequirementsOpen] = useState(false)
+  const [topicsOpen, setTopicsOpen] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -115,10 +120,6 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
             className="h-7 w-9 cursor-pointer rounded border border-border bg-bg p-0.5"
           />
         </label>
-        <Button variant="secondary" size="sm" onClick={() => navigate(`/kanvas/${area.id}`)}>
-          <Waypoints size={ICON_SIZE} />
-          Kanvasta Planla
-        </Button>
         {confirmingDelete ? (
           <div className="flex items-center gap-1 text-xs">
             <span className="text-text-secondary">Emin misin?</span>
@@ -138,6 +139,46 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
       </div>
 
       <AreaGoals areaId={area.id} />
+
+      <button
+        type="button"
+        onClick={() => setTopicsOpen((v) => !v)}
+        aria-expanded={topicsOpen}
+        className="mt-4 flex w-full items-center gap-1.5 text-left text-xs font-semibold uppercase tracking-wide text-text-secondary hover:text-text"
+      >
+        <ChevronRight
+          size={ICON_SIZE}
+          className={`transition-transform motion-safe:duration-150 ${topicsOpen ? 'rotate-90' : ''}`}
+        />
+        Konular
+        <span className="font-normal normal-case tracking-normal">
+          ({topicsLoading ? '…' : `${topics.length} adet`})
+        </span>
+      </button>
+      {topicsOpen && (
+        <>
+          <div className="mt-2 flex flex-col gap-2">
+            {topicsLoading ? (
+              <SkeletonLines count={LOADING_ROW_COUNT} className="h-10" />
+            ) : topics.length === 0 ? (
+              <p className="text-sm text-text-secondary">Henüz konu yok.</p>
+            ) : (
+              topics.map((topic) => (
+                <TopicRow key={topic.id} uid={uid} areaId={area.id} topic={topic} />
+              ))
+            )}
+          </div>
+
+          {showNewTopic ? (
+            <NewTopicForm uid={uid} areaId={area.id} onDone={() => setShowNewTopic(false)} />
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setShowNewTopic(true)} className="mt-3">
+              <Plus size={ICON_SIZE} />
+              Konu ekle
+            </Button>
+          )}
+        </>
+      )}
 
       <button
         type="button"
@@ -173,6 +214,7 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
                   areaId={area.id}
                   requirement={requirement}
                   all={requirements}
+                  topics={topics}
                 />
               ))
             )}
@@ -182,6 +224,7 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
             <NewRequirementForm
               uid={uid}
               areaId={area.id}
+              topics={topics}
               onDone={() => setShowNewRequirement(false)}
             />
           ) : (
@@ -241,6 +284,7 @@ function RequirementNode({
   areaId,
   requirement,
   all,
+  topics,
   depth = 0,
 }: {
   uid: string
@@ -248,6 +292,8 @@ function RequirementNode({
   requirement: Requirement
   /** Bu alanın tüm gereklilikleri — alt/üst ilişkisini kurmak için. */
   all: Requirement[]
+  /** Konu badge'i ve alt gereklilik formundaki "Konu" seçici için. */
+  topics: Topic[]
   depth?: number
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -280,6 +326,11 @@ function RequirementNode({
             <p className="text-sm text-text">{requirement.name}</p>
             <div className="flex flex-wrap gap-1.5">
               <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[requirement.type]}</Badge>
+              {requirement.topicId && (
+                <Badge variant="neutral">
+                  {topics.find((t) => t.id === requirement.topicId)?.name ?? 'konu'}
+                </Badge>
+              )}
               {isParent && <Badge variant="primary">{kids.length} alt gereklilik</Badge>}
               {linkedTasks.length > 0 && (
                 <Badge variant="primary">
@@ -347,6 +398,7 @@ function RequirementNode({
           <NewRequirementForm
             uid={uid}
             areaId={areaId}
+            topics={topics}
             parentRequirementId={requirement.id}
             onDone={() => setShowAddChild(false)}
           />
@@ -362,6 +414,7 @@ function RequirementNode({
               areaId={areaId}
               requirement={child}
               all={all}
+              topics={topics}
               depth={depth + 1}
             />
           ))}
@@ -374,11 +427,13 @@ function RequirementNode({
 function NewRequirementForm({
   uid,
   areaId,
+  topics,
   parentRequirementId,
   onDone,
 }: {
   uid: string
   areaId: string
+  topics: Topic[]
   /** Verilirse yeni gereklilik bu gerekliliğin altına eklenir. */
   parentRequirementId?: string
   onDone: () => void
@@ -387,6 +442,7 @@ function NewRequirementForm({
   const [type, setType] = useState<RequirementType>('bilgi')
   const [targetMetric, setTargetMetric] = useState('1')
   const [unit, setUnit] = useState('')
+  const [topicId, setTopicId] = useState('')
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -404,6 +460,7 @@ function NewRequirementForm({
       currentValue: 0,
       unit: unit.trim(),
       parentRequirementId,
+      topicId: topicId || undefined,
     })
     onDone()
   }
@@ -451,6 +508,132 @@ function NewRequirementForm({
           onChange={(e) => setUnit(e.target.value)}
           placeholder="ör. sertifika"
           className={`${inputClass} w-28`}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-text-secondary">
+        Konu
+        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} className={inputClass}>
+          <option value="">—</option>
+          {topics.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Button type="submit" variant="primary" size="sm">
+        Ekle
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onDone}>
+        Vazgeç
+      </Button>
+    </form>
+  )
+}
+
+function TopicRow({ uid, areaId, topic }: { uid: string; areaId: string; topic: Topic }) {
+  const navigate = useNavigate()
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(topic.name)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus()
+  }, [editingName])
+
+  async function handleRename() {
+    const trimmed = nameDraft.trim()
+    if (trimmed && trimmed !== topic.name) {
+      await renameTopic(uid, areaId, topic.id, trimmed)
+    } else {
+      setNameDraft(topic.name)
+    }
+    setEditingName(false)
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-bg/50 p-3">
+      {editingName ? (
+        <input
+          ref={nameInputRef}
+          className={inputClass}
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => void handleRename()}
+          onKeyDown={(e) => e.key === 'Enter' && void handleRename()}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingName(true)}
+          className="flex items-center gap-2 text-left text-sm text-text"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <BookOpen size={ICON_SIZE} />
+          </span>
+          {topic.name}
+        </button>
+      )}
+      <div className="flex items-center gap-1">
+        <Button variant="secondary" size="sm" onClick={() => navigate(`/hayat-alanlari/${areaId}/konu/${topic.id}`)}>
+          Çalışma ortamına git
+          <ChevronRight size={ICON_SIZE} />
+        </Button>
+        {confirmingDelete ? (
+          <div className="flex items-center gap-1 text-xs">
+            <Button variant="danger" size="sm" onClick={() => void deleteTopic(uid, areaId, topic.id)}>
+              Sil
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+              Vazgeç
+            </Button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
+            <Trash2 size={ICON_SIZE} />
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function NewTopicForm({
+  uid,
+  areaId,
+  onDone,
+}: {
+  uid: string
+  areaId: string
+  onDone: () => void
+}) {
+  const [name, setName] = useState('')
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    nameInputRef.current?.focus()
+  }, [])
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await createTopic(uid, areaId, trimmed)
+    onDone()
+  }
+
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="mt-3 flex flex-wrap items-end gap-2">
+      <label className="flex flex-1 flex-col gap-1 text-xs text-text-secondary">
+        Ad
+        <input
+          ref={nameInputRef}
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="ör. Atölye Kurma"
+          className={inputClass}
         />
       </label>
       <Button type="submit" variant="primary" size="sm">

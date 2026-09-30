@@ -84,6 +84,7 @@ export interface NewTaskInput {
   parentTaskId?: string
   lifeAreaId?: string
   requirementId?: string
+  topicIds?: string[]
   bufferMinutes: number
   detailLevel: DetailLevel
   dependencies?: TaskDependency[]
@@ -137,6 +138,7 @@ export type TaskFieldsUpdate = Partial<
     | 'parentTaskId'
     | 'lifeAreaId'
     | 'requirementId'
+    | 'topicIds'
     | 'accentColor'
     | 'canvasY'
     | 'scale'

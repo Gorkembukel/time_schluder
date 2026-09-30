@@ -20,6 +20,14 @@ vi.mock('../../services/repositories/requirementsRepository', () => ({
   deleteRequirement: vi.fn(),
 }))
 
+vi.mock('../../services/repositories/topicsRepository', () => ({
+  subscribeTopics: vi.fn(() => () => {}),
+  createTopic: vi.fn(),
+  renameTopic: vi.fn(),
+  updateTopicDescription: vi.fn(),
+  deleteTopic: vi.fn(),
+}))
+
 import { createLifeArea } from '../../services/repositories/lifeAreasRepository'
 
 function renderPage() {

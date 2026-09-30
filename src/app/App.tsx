@@ -25,7 +25,7 @@ import { KanbanPage } from '../features/is-takibi/KanbanPage'
 import { ProgramPage } from '../features/program/ProgramPage'
 import { RobotPage } from '../features/robot/RobotPage'
 import { HayatAlanlariPage } from '../features/hayat-alanlari/HayatAlanlariPage'
-import { PlanningCanvasPage } from '../features/kanvas/PlanningCanvasPage'
+import { KonuDetayPage } from '../features/hayat-alanlari/KonuDetayPage'
 import { FinansPage } from '../features/finans/FinansPage'
 import { AyarlarPage } from '../features/ayarlar/AyarlarPage'
 
@@ -97,7 +97,7 @@ export function App({ uid }: { uid: string }) {
             <Route path="/pano" element={<KanbanPage />} />
             <Route path="/robot" element={<RobotPage />} />
             <Route path="/hayat-alanlari" element={<HayatAlanlariPage />} />
-            <Route path="/kanvas/:areaId" element={<PlanningCanvasPage />} />
+            <Route path="/hayat-alanlari/:areaId/konu/:topicId" element={<KonuDetayPage />} />
             <Route path="/finans" element={<FinansPage />} />
             <Route path="/ayarlar" element={<AyarlarPage />} />
           </Routes>

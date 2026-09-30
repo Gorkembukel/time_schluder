@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useRequirements } from '../../hooks/useRequirements'
+import { useTopics } from '../../hooks/useTopics'
 import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
 import { effectiveLifeAreaId, overlapsRange } from '../../lib/taskHierarchy'
 import { PLANNING_SCALE_LABELS, type PlanningScale } from '../../types/domain'
@@ -30,6 +31,7 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
   const [endTime, setEndTime] = useState(DEFAULT_END_TIME)
   const [lifeAreaId, setLifeAreaId] = useState('')
   const [requirementId, setRequirementId] = useState('')
+  const [topicIds, setTopicIds] = useState<string[]>([])
   const [parentId, setParentId] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +41,11 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
   const inheritedAreaName = areas.find((a) => a.id === inheritedAreaId)?.name
   const areaIdForRequirements = lifeAreaId || inheritedAreaId || ''
   const { requirements } = useRequirements(uid, areaIdForRequirements)
+  const { topics } = useTopics(uid, areaIdForRequirements)
+
+  function toggleTopic(topicId: string) {
+    setTopicIds((prev) => (prev.includes(topicId) ? prev.filter((id) => id !== topicId) : [...prev, topicId]))
+  }
 
   const dayStart = startOfDay(new Date(`${date}T00:00:00`))
   const dayEnd = endOfDay(dayStart)
@@ -66,12 +73,14 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
       parentTaskId: parentId || undefined,
       lifeAreaId: lifeAreaId || undefined,
       requirementId: requirementId || undefined,
+      topicIds: topicIds.length ? topicIds : undefined,
       bufferMinutes: 0,
       detailLevel: determineDetailLevel('hour', startAt, new Date(), detailWindowDays),
     })
 
     setTitle('')
     setRequirementId('')
+    setTopicIds([])
     onCreated()
   }
 
@@ -171,6 +180,25 @@ export function TaskForm({ defaultDate, onCreated }: { defaultDate: Date; onCrea
           ))}
         </select>
       </label>
+      {topics.length > 0 && (
+        <div className="flex w-full flex-wrap items-center gap-1.5">
+          <span className="text-xs text-text-secondary">Konular</span>
+          {topics.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => toggleTopic(t.id)}
+              className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                topicIds.includes(t.id)
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-text-secondary hover:bg-border/40'
+              }`}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
       {error && <p className="w-full text-xs text-danger">{error}</p>}
       <Button type="submit" variant="primary">
         <Plus size={16} />

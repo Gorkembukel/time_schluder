@@ -4,6 +4,7 @@ import { Plus, Save } from 'lucide-react'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useRequirements } from '../../hooks/useRequirements'
+import { useTopics } from '../../hooks/useTopics'
 import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
 import { createTask, updateTaskFields } from '../../services/repositories/tasksRepository'
 import { coarserScale, determineDetailLevel } from '../../lib/planning-engine'
@@ -50,12 +51,18 @@ export function GoalForm({
   const [parentId, setParentId] = useState(fixedParentId ?? task?.parentTaskId ?? '')
   const [lifeAreaId, setLifeAreaId] = useState(task?.lifeAreaId ?? defaultLifeAreaId ?? '')
   const [requirementId, setRequirementId] = useState(task?.requirementId ?? '')
+  const [topicIds, setTopicIds] = useState<string[]>(task?.topicIds ?? [])
   const [error, setError] = useState<string | null>(null)
 
   const parent = parentId ? index.get(parentId) : undefined
   const inheritedAreaId = parent ? effectiveLifeAreaId(parent, index) : undefined
   const areaIdForRequirements = lifeAreaId || inheritedAreaId || ''
   const { requirements } = useRequirements(uid, areaIdForRequirements)
+  const { topics } = useTopics(uid, areaIdForRequirements)
+
+  function toggleTopic(topicId: string) {
+    setTopicIds((prev) => (prev.includes(topicId) ? prev.filter((id) => id !== topicId) : [...prev, topicId]))
+  }
 
   // Ebeveyn adayları: bir üst ölçekteki, seçili tarihlerle kesişen işler (kendisi ve torunları hariç).
   const parentScale = coarserScale(scale)
@@ -95,6 +102,7 @@ export function GoalForm({
         parentTaskId: parentId,
         lifeAreaId,
         requirementId,
+        topicIds,
       })
     } else {
       await createTask(uid, {
@@ -105,6 +113,7 @@ export function GoalForm({
         parentTaskId: parentId || undefined,
         lifeAreaId: lifeAreaId || undefined,
         requirementId: requirementId || undefined,
+        topicIds: topicIds.length ? topicIds : undefined,
         bufferMinutes: 0,
         detailLevel: determineDetailLevel(scale, startAt, new Date(), detailWindowDays),
       })
@@ -202,6 +211,25 @@ export function GoalForm({
           ))}
         </select>
       </label>
+      {topics.length > 0 && (
+        <div className="flex w-full flex-wrap items-center gap-1.5">
+          <span className="text-xs text-text-secondary">Konular</span>
+          {topics.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => toggleTopic(t.id)}
+              className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                topicIds.includes(t.id)
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-text-secondary hover:bg-border/40'
+              }`}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
       {error && <p className="w-full text-xs text-danger">{error}</p>}
       <Button type="submit" variant="primary" size="sm">
         {task ? <Save size={ICON_SIZE} /> : <Plus size={ICON_SIZE} />}
