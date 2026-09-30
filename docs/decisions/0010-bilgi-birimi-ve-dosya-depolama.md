@@ -26,3 +26,12 @@ Excel kanıtları: konuya bağlı YouTube playlist linkleri, harici bir ünivers
 - Yeni top-level koleksiyon `knowledgeItems`; `firestore.rules`'daki mevcut `users/{userId}/{document=**}` kuralı (ADR 0003) değişmeden kapsar.
 - Kullanıcı gerçek dosya yükleme isterse: bu ayrı bir karar (Blaze plana geçiş) olarak kullanıcıya sunulmalı, otomatik uygulanmamalı.
 - `config/knowledge-item-types.ts` yeni bir config dosyası olarak `config-audit`'in denetim kapsamına girer.
+
+## Ek: GitHub'ı kişisel dosya barındırma yeri olarak kullanma (2026-09-30)
+Kullanıcı, "yalnızca link" kararı kapsamında `doküman` bilgi birimi için GitHub'da (ör. ayrı bir private repo) dosya biriktirip linkini vermeyi önerdi. Bu, tasarımı değiştirmeden zaten çalışır:
+- **Public repo**: `raw.githubusercontent.com/...` linki doğrudan, kimlik doğrulamasız açılır.
+- **Private repo**: `github.com/.../blob/...` linki, kullanıcı kendi tarayıcısında zaten kendi GitHub hesabına giriş yapmış olduğu için (tek kullanıcılı kişisel kullanım) sorunsuz açılır.
+
+Kullanıcı ayrıca, uygulamaya bir "GitHub hesabı bağlama" mekanizması (API key/secret girmeden) eklenip eklenemeyeceğini sordu — **araştırıldı ve mümkün değil**: GitHub'ın OAuth token değişim uç noktası (`/login/oauth/access_token`) tarayıcıdan doğrudan çağrılamaz (CORS engelli) ve hem klasik web akışı hem de device flow, `client_secret` gerektirir; GitHub, public client'lar için PKCE (secret'sız akış) desteklemiyor ([topluluk isteği hâlâ açık](https://github.com/orgs/community/discussions/15752)). Secret'ı istemci paketine gömmek gerçek bir güvenlik açığı olurdu; secret'ı gizleyecek bir backend/proxy ise "Spark + Cloud Functions yok" mimarisinin dışına çıkardı.
+
+**Karar: entegrasyon eklenmiyor.** Private repo linkleri, kullanıcının kendi tarayıcı oturumu üzerinden zaten çalıştığı için uygulamanın GitHub'ı tanımasına gerek yok — `doküman` bilgi birimi bu linki sıradan bir URL olarak saklar, ADR'nin geri kalanında değişiklik yok. Daha derin entegrasyon (repo içeriğini uygulama içinde listeleme/önizleme) ileride istenirse, o zaman bir Personal Access Token (kullanıcının kendi oluşturup Ayarlar'a yapıştıracağı, salt-okunur ve tek repo'ya kapsamlı bir token — bir "app secret" değil) en basit seçenek olarak değerlendirilebilir; bugün için kapsam dışı.
