@@ -77,6 +77,48 @@ export interface Requirement {
   unit: string
   /** Üst gereklilik (aynı hayat alanı içinde) — ör. "Robotik" altında "ROS bilgisi", "Arduino kiti". */
   parentRequirementId?: string
+  /** Bu gerekliliğin ait olduğu konu (aynı hayat alanı içinde) — bkz. docs/decisions/0009. */
+  topicId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Bir hayat alanına bağlı, zamana bağlı olmayan kalıcı çalışma alanı. Epic/Story/Task zaman
+ * hiyerarşisine dik bir bağlamdır, hiyerarşide bir seviye değildir (Jira "Component" analojisi,
+ * bkz. docs/decisions/0009). Bilgi birimleri ve gereklilikler buraya bağlanır.
+ */
+export interface Topic {
+  id: string
+  lifeAreaId: string
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Ayarlardan düzenlenebilir — Gereklilik türünün aksine ürün kararıyla sabitlenmedi (bkz. docs/decisions/0010). */
+export const KNOWLEDGE_ITEM_TYPES = ['not', 'link', 'dokuman', 'kisi', 'tasarim-karari'] as const
+export type KnowledgeItemType = (typeof KNOWLEDGE_ITEM_TYPES)[number]
+
+export const KNOWLEDGE_ITEM_TYPE_LABELS: Record<KnowledgeItemType, string> = {
+  not: 'Not',
+  link: 'Link',
+  dokuman: 'Doküman',
+  kisi: 'Kişi',
+  'tasarim-karari': 'Tasarım kararı',
+}
+
+/** Bir konunun çalışma ortamında biriken, görev olmayan kayıt (bkz. docs/decisions/0010). */
+export interface KnowledgeItem {
+  id: string
+  type: KnowledgeItemType
+  title: string
+  /** `not`/`kisi`/`tasarim-karari` için serbest metin; `link`/`dokuman` için URL. */
+  body: string
+  topicId: string
+  taskId?: string
+  requirementId?: string
   createdAt: string
   updatedAt: string
 }
@@ -117,6 +159,8 @@ export interface Task {
   parentTaskId?: string
   lifeAreaId?: string
   requirementId?: string
+  /** Bu işe etiketlenen konular — çoklu, opsiyonel, hiyerarşiyi/roll-up'ı etkilemez (bkz. docs/decisions/0009). */
+  topicIds?: string[]
   status: TaskStatus
   dependencies: TaskDependency[]
   bufferMinutes: number

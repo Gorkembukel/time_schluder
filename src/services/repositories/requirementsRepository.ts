@@ -39,6 +39,8 @@ export interface NewRequirementInput {
   unit: string
   /** Üst gereklilik — verilirse bu, o gerekliliğin altında bir alt gereklilik olur. */
   parentRequirementId?: string
+  /** Bu gerekliliğin bağlı olduğu konu (aynı hayat alanı içinde), opsiyonel. */
+  topicId?: string
 }
 
 export async function createRequirement(

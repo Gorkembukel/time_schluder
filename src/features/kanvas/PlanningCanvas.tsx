@@ -113,6 +113,7 @@ const MIN_RESIZE_HOURS = 0.25
 const CANVAS_GAP_PX = 16
 const MIN_CANVAS_HEIGHT_PX = 240
 const EXPANDED_MIN_CANVAS_HEIGHT_PX = 640
+const TASK_LIST_MAX_HEIGHT_PX = 640
 
 function curvePath(from: Point, to: Point): string {
   return `M ${from.x},${from.y} C ${from.x + CURVE_OFFSET_PX},${from.y} ${to.x - CURVE_OFFSET_PX},${to.y} ${to.x},${to.y}`
@@ -165,13 +166,21 @@ function connectedDraftGroup(
 }
 
 /**
- * Görsel Planlama Kanvası ("task-organizer-kanvas"): bir hayat alanının (ya da bir işin
- * alt-kanvasının) taslak görev zincirini kurduğunuz ve gerçek işlere kilitlediğiniz alan.
- * Üstte taslak şerit (havuzdan sürüklenen, henüz tarihe bağlanmamış, kanvasa sabit kutucuklar);
- * altta, aynı sürekli zaman ekseninde, kilitli/gerçek işlerin zaman çizelgesi. Bkz.
- * `lib/canvasLayout.ts` (saf zoom/pan/lane hesapları) ve `services/repositories/canvasDraftsRepository.ts`.
+ * Görsel Planlama Kanvası ("task-organizer-kanvas"): bir konunun (ya da bir işin alt-kanvasının)
+ * taslak görev zincirini kurduğunuz ve gerçek işlere kilitlediğiniz alan — Konu Çalışma Ortamı'nın
+ * bir sekmesi (bkz. docs/decisions/0009). Solda taslak+yerleşmiş işlerin filtrelenebilir listesi
+ * (havuz), sağda aynı sürekli zaman ekseninde zaman çizelgesi. Bkz. `lib/canvasLayout.ts` (saf
+ * zoom/pan/lane hesapları) ve `services/repositories/canvasDraftsRepository.ts`.
  */
-export function PlanningCanvas({ areaId }: { areaId: string }) {
+export function PlanningCanvas({
+  areaId,
+  topicId,
+  topicName,
+}: {
+  areaId: string
+  topicId: string
+  topicName: string
+}) {
   const uid = useUid()
   const settings = useSettingsStore((s) => s.settings)
   const area = useLifeAreasStore((s) => s.areas.find((a) => a.id === areaId))
@@ -179,7 +188,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
   const { tasks, index, children } = useTaskHierarchy()
 
   const [stack, setStack] = useState<ContextLevel[]>([
-    { contextId: areaId, scale: 'year3', label: area?.name ?? 'Kanvas' },
+    { contextId: topicId, scale: 'year3', label: topicName },
   ])
   const currentLevel = stack[stack.length - 1]
   const { draft, loading: draftLoading } = useCanvasDraft(uid, currentLevel.contextId)
@@ -211,12 +220,13 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
 
   const realTasks: Task[] = useMemo(() => {
     // Ölçek artık süreden çıkarıldığı için kök seviyedeki işler tek bir ölçeğe (year3) bağlı
-    // değil — hangi ölçekte kilitlenmişse o şekilde görünür.
+    // değil — hangi ölçekte kilitlenmişse o şekilde görünür. Kök seviyede kanvas artık konuya
+    // bağlı (bkz. docs/decisions/0009): yalnızca bu konuya etiketlenmiş kök işler görünür.
     if (!currentLevel.parentTaskId) {
-      return tasks.filter((t) => !t.parentTaskId && t.lifeAreaId === areaId)
+      return tasks.filter((t) => !t.parentTaskId && t.topicIds?.includes(topicId))
     }
     return children.get(currentLevel.parentTaskId) ?? []
-  }, [tasks, children, currentLevel, areaId])
+  }, [tasks, children, currentLevel, topicId])
 
   const bounds = useMemo(() => {
     const range = boundingRange(realTasks)
@@ -642,6 +652,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
       endAt: endAt.toISOString(),
       parentTaskId: currentLevel.parentTaskId,
       lifeAreaId: currentLevel.parentTaskId ? undefined : areaId,
+      topicIds: currentLevel.parentTaskId ? undefined : [topicId],
       status: 'planned',
       dependencies: [],
       bufferMinutes: 0,
@@ -724,6 +735,14 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
     setView((v) => zoomView(v ?? bounds, CENTER_RATIO, factor, MIN_VIEW_DURATION_MS, worldBounds))
   }
 
+  /** Soldaki listede planlanmış (gerçek) bir işe tıklanınca zaman şeridini o işe odaklar. */
+  function focusRealTask(task: Task) {
+    const start = new Date(task.startAt)
+    const end = new Date(task.endAt)
+    const padMs = Math.max(end.getTime() - start.getTime(), HOUR_MS)
+    setView({ start: new Date(start.getTime() - padMs), end: new Date(end.getTime() + padMs) })
+  }
+
   const nowRatio = timeRatio(new Date(), currentView)
   const showNow = new Date() >= currentView.start && new Date() <= currentView.end
 
@@ -780,8 +799,10 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
         </p>
       )}
 
-      <PoolPanel
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[260px_1fr]">
+      <TaskPoolPanel
         pool={draft.pool}
+        realTasks={realTasks}
         loading={draftLoading}
         areaColor={areaColor}
         editingPoolId={editingPoolId}
@@ -799,6 +820,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
         }}
         onRemove={removePoolItem}
         onPointerDownItem={handlePoolPointerDown}
+        onFocusRealTask={focusRealTask}
       />
 
       <div
@@ -1149,6 +1171,7 @@ export function PlanningCanvas({ areaId }: { areaId: string }) {
           </div>
         )}
       </div>
+      </div>
 
       {poolDrag && (
         <div
@@ -1204,8 +1227,19 @@ function NodePorts({
   )
 }
 
-function PoolPanel({
+type KindFilter = 'all' | TaskKind
+type StatusFilter = 'all' | 'planned' | 'unplanned'
+type DepFilter = 'all' | 'yes' | 'no'
+
+/**
+ * Solda, kayan ve filtrelenebilen tek bir görev listesi: havuzdaki taslaklar (henüz kanvasa
+ * yerleştirilmemiş, sürüklenebilir) ve bu seviyedeki gerçek işler (zaten yerleşmiş, tıklanınca
+ * zaman şeridi o işe odaklanır) bir arada — bkz. kullanıcı isteği: "solda kayacak, birikecek,
+ * filtrelenebilecek".
+ */
+function TaskPoolPanel({
   pool,
+  realTasks,
   loading,
   areaColor,
   editingPoolId,
@@ -1217,8 +1251,10 @@ function PoolPanel({
   onSaveEdit,
   onRemove,
   onPointerDownItem,
+  onFocusRealTask,
 }: {
   pool: CanvasDraftPoolItem[]
+  realTasks: Task[]
   loading: boolean
   areaColor: string
   editingPoolId: string | null
@@ -1230,21 +1266,50 @@ function PoolPanel({
   onSaveEdit: (id: string, fields: Partial<CanvasDraftPoolItem>) => void
   onRemove: (id: string) => void
   onPointerDownItem: (e: ReactPointerEvent<HTMLElement>, item: CanvasDraftPoolItem) => void
+  onFocusRealTask: (task: Task) => void
 }) {
   const [title, setTitle] = useState('')
   const [hours, setHours] = useState(String(DEFAULT_HOURS))
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR)
   const [kind, setKind] = useState<TaskKind>('task')
+  const [search, setSearch] = useState('')
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [depFilter, setDepFilter] = useState<DepFilter>('all')
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (showAddForm) titleInputRef.current?.focus()
   }, [showAddForm])
 
+  const query = search.trim().toLowerCase()
+  const visiblePool = pool.filter((item) => {
+    if (query && !item.title.toLowerCase().includes(query)) return false
+    if (kindFilter !== 'all' && (item.kind ?? 'task') !== kindFilter) return false
+    if (statusFilter === 'planned') return false
+    if (depFilter === 'yes') return false
+    return true
+  })
+  const visibleReal = realTasks.filter((task) => {
+    if (query && !task.title.toLowerCase().includes(query)) return false
+    if (kindFilter !== 'all' && (task.kind ?? 'task') !== kindFilter) return false
+    if (statusFilter === 'unplanned') return false
+    const hasDependency = task.dependencies.length > 0
+    if (depFilter === 'yes' && !hasDependency) return false
+    if (depFilter === 'no' && hasDependency) return false
+    return true
+  })
+  const isEmpty = visiblePool.length === 0 && visibleReal.length === 0
+
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg/40 p-3">
+    <div
+      className="flex flex-col gap-2 rounded-lg border border-border bg-bg/40 p-3"
+      style={{ maxHeight: TASK_LIST_MAX_HEIGHT_PX }}
+    >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Havuz</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Görevler ({visiblePool.length + visibleReal.length})
+        </h3>
         <Button variant="ghost" size="sm" onClick={onToggleAddForm}>
           <Plus size={ICON_SIZE} />
           Havuza ekle
@@ -1308,50 +1373,153 @@ function PoolPanel({
         </form>
       )}
 
-      {pool.length === 0 && !loading ? (
-        <p className="text-xs text-text-secondary">
-          Havuz boş. Yukarıdan bir görev ekleyip aşağıdaki kanvasa sürükleyin.
-        </p>
-      ) : (
-        <ul className="flex flex-wrap gap-2">
-          {pool.map((item) =>
-            editingPoolId === item.id ? (
-              <PoolEditForm key={item.id} item={item} onCancel={onCancelEdit} onSave={onSaveEdit} />
-            ) : (
-              <li
-                key={item.id}
-                onPointerDown={(e) => onPointerDownItem(e, item)}
-                className="group flex cursor-grab items-center gap-1.5 rounded-lg border border-dashed border-text-secondary/50 px-2 py-1 text-xs text-text active:cursor-grabbing"
-                style={{ background: twoTone(areaColor, item.accentColor ?? DEFAULT_ACCENT_COLOR) }}
-              >
-                {item.kind === 'milestone' && (
-                  <span aria-hidden className="h-2 w-2 shrink-0 rotate-45 rounded-[1px] bg-text/70" />
-                )}
-                <span className="font-medium">{item.title}</span>
-                {item.kind !== 'milestone' && <span className="opacity-80">{item.hours}s</span>}
-                <button
-                  type="button"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => onStartEdit(item.id)}
-                  aria-label={`${item.title}: düzenle`}
-                  className="ml-1 hidden rounded bg-surface p-0.5 text-text-secondary group-hover:block"
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Görev ara…"
+        className="rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text"
+      />
+      <FilterChipRow
+        label="Tür"
+        value={kindFilter}
+        onChange={setKindFilter}
+        options={[
+          { value: 'all', label: 'Tümü' },
+          { value: 'task', label: 'Görev' },
+          { value: 'milestone', label: 'Kilometre taşı' },
+        ]}
+      />
+      <FilterChipRow
+        label="Durum"
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={[
+          { value: 'all', label: 'Tümü' },
+          { value: 'planned', label: 'Planlanmış' },
+          { value: 'unplanned', label: 'Planlanmamış' },
+        ]}
+      />
+      <FilterChipRow
+        label="Bağımlılık"
+        value={depFilter}
+        onChange={setDepFilter}
+        options={[
+          { value: 'all', label: 'Tümü' },
+          { value: 'yes', label: 'Var' },
+          { value: 'no', label: 'Yok' },
+        ]}
+      />
+
+      <div className="flex-1 overflow-y-auto">
+        {isEmpty && !loading ? (
+          <p className="p-2 text-xs text-text-secondary">
+            {pool.length === 0 && realTasks.length === 0
+              ? 'Henüz görev yok. Yukarıdan bir görev ekleyip zaman şeridine sürükleyin.'
+              : 'Bu filtrelerle eşleşen görev yok.'}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {visiblePool.map((item) =>
+              editingPoolId === item.id ? (
+                <PoolEditForm key={item.id} item={item} onCancel={onCancelEdit} onSave={onSaveEdit} />
+              ) : (
+                <li
+                  key={item.id}
+                  onPointerDown={(e) => onPointerDownItem(e, item)}
+                  className="group flex cursor-grab items-center gap-1.5 rounded-lg border border-dashed border-text-secondary/50 px-2 py-1.5 text-xs text-text active:cursor-grabbing"
+                  style={{ background: twoTone(areaColor, item.accentColor ?? DEFAULT_ACCENT_COLOR) }}
                 >
-                  ✎
-                </button>
-                <button
-                  type="button"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => onRemove(item.id)}
-                  aria-label={`${item.title}: sil`}
-                  className="hidden rounded bg-surface p-0.5 text-text-secondary group-hover:block"
-                >
-                  <Trash2 size={ICON_SIZE} />
-                </button>
-              </li>
-            ),
-          )}
-        </ul>
-      )}
+                  {item.kind === 'milestone' && (
+                    <span aria-hidden className="h-2 w-2 shrink-0 rotate-45 rounded-[1px] bg-text/70" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate font-medium">{item.title}</span>
+                  {item.kind !== 'milestone' && <span className="opacity-80">{item.hours}s</span>}
+                  <span className="rounded-full bg-warning/20 px-1.5 py-0.5 text-[0.6rem] font-semibold text-warning">
+                    planlanmamış
+                  </span>
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => onStartEdit(item.id)}
+                    aria-label={`${item.title}: düzenle`}
+                    className="hidden rounded bg-surface p-0.5 text-text-secondary group-hover:block"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => onRemove(item.id)}
+                    aria-label={`${item.title}: sil`}
+                    className="hidden rounded bg-surface p-0.5 text-text-secondary group-hover:block"
+                  >
+                    <Trash2 size={ICON_SIZE} />
+                  </button>
+                </li>
+              ),
+            )}
+            {visibleReal.map((task) => {
+              const hasDependency = task.dependencies.length > 0
+              return (
+                <li key={task.id}>
+                  <button
+                    type="button"
+                    onClick={() => onFocusRealTask(task)}
+                    className="flex w-full items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5 text-left text-xs text-text hover:border-primary/50"
+                  >
+                    {task.kind === 'milestone' && (
+                      <span aria-hidden className="h-2 w-2 shrink-0 rotate-45 rounded-[1px] bg-text/70" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate font-medium">{task.title}</span>
+                    <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[0.6rem] font-semibold text-success">
+                      planlanmış
+                    </span>
+                    {hasDependency && (
+                      <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[0.6rem] font-semibold text-primary">
+                        {task.dependencies.length} bağımlılık
+                      </span>
+                    )}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FilterChipRow<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string
+  value: T
+  onChange: (v: T) => void
+  options: { value: T; label: string }[]
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-text-secondary">
+        {label}
+      </span>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`rounded-full border px-2 py-0.5 text-[0.65rem] font-medium ${
+            value === o.value
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border text-text-secondary hover:bg-border/40'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }
