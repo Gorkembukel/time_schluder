@@ -1,7 +1,7 @@
 # 0011. Gerekliliklerde envanter durumu ve deneyim notundan gereklilik türetme
 
 ## Durum
-Önerildi
+Kabul edildi
 
 ## Bağlam
 Mevcut `Requirement` yalnızca sayısal ilerleme tutuyor (`currentValue/targetMetric/unit` — fork araştırmasıyla doğrulandı, `src/types/domain.ts`). Excel kanıtı (Atölye sayfası) "elimde var mı / alınacak mı" gibi ikili bir envanter durumu içeriyordu (ör. multiplexer, tornavida seti, komponent hazneleri — "var mı" kolonu, ürün linki, tür); bu, sayısal ilerlemeden farklı bir boyut. Ayrıca Excel'de bir işi yaparken edinilen deneyimin doğrudan yeni bir ihtiyaca dönüştüğü örnekler var (robotik kol projesi, kod 004): montajda uygun el aleti yokluğu → küçük elektrikli matkap ihtiyacı; uygun jumper yokluğu → bağlantı güvenilirliği ihtiyacı; 4 servo için ESP'den güç çekince aşırı ısınma → ayrı güç kaynağı ihtiyacı. Bu akış hiç modellenmemiş.

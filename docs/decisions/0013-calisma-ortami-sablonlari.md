@@ -1,7 +1,7 @@
 # 0013. Çalışma ortamı şablonları: kopya mı, referans mı
 
 ## Durum
-Önerildi
+Kabul edildi
 
 ## Bağlam
 Bazı konular standart (bilgi birimi + gereklilik) şemasına sığmıyor. Excel kanıtları:

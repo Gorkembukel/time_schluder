@@ -1,7 +1,7 @@
 # 0009. Konu kavramı ve zaman hiyerarşisiyle ilişkisi
 
 ## Durum
-Önerildi
+Kabul edildi
 
 ## Bağlam
 Kullanıcının uygulama öncesi kullandığı Excel'de, zaman katmanının yanında hayat alanı altında kalıcı, zamana bağlı olmayan çalışma alanları vardı (ör. "Mobil development", "Atölye kurma yolunda", "LLM orchestrator" sayfaları). Mevcut modelde Hayat Alanı (Initiative) doğrudan Gereklilik ve zaman hiyerarşisine (Epic/Story/Task) bağlanıyor; bu ikisi arasında kalıcı bir "Konu" kavramı yok. Mevcut hiyerarşi (Initiative→Epic→Story→Task, parent link, roll-up — bkz. `docs/domain-glossary.md`, `.claude/personas/jira-developer.md`) ve onun kod karşılığı (`src/lib/taskHierarchy.ts`: `ancestorsOf`, `effectiveLifeAreaId`, `rollupProgress`; `requirementsRepository.ts`'deki gereklilik roll-up'ı) çalışıyor ve test edilmiş durumda — bu ADR bunu bozmadan yeni kavramın yerini belirler.

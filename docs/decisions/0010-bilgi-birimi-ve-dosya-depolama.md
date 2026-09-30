@@ -1,7 +1,7 @@
 # 0010. Bilgi birimi modeli ve dosya depolama kısıtı
 
 ## Durum
-Önerildi
+Kabul edildi
 
 ## Bağlam
 Excel kanıtları: konuya bağlı YouTube playlist linkleri, harici bir üniversitenin robot kılavuzu linki, kişi/ilişki bilgisi notu (bir şirket başkanının aynı zamanda ticaret odası başkanı olduğu bilgisi), tasarım kararı notu ("safety için logic kısmı rölelerle yapılırsa software bug girmez"). Hiçbiri bir "iş" değil, ama konunun çalışma ortamında birikmesi gereken bilgi. Fork araştırması doğruladı: kodda not/link/doküman/kişi ekleme özelliğine dair hiçbir iz yok — sıfırdan tasarlanacak.

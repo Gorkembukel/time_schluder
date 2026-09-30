@@ -1,7 +1,7 @@
 # 0012. Planlı harcama: fiyatlı gereklilikten finans işlemine zincir
 
 ## Durum
-Önerildi
+Kabul edildi
 
 ## Bağlam
 Mevcut finans modülünde yalnızca gerçekleşmiş işlemler (`FinanceTransaction`) var; bir gerekliliğin tahmini maliyeti ile bütçe planlaması arasında bağ yok. Fork araştırması: `FinanceTransaction.requirementId` alanı zaten var ve çalışıyor (bir gerçekleşmiş işlem bir gerekliliğe bağlanabiliyor), ama "henüz gerçekleşmemiş, planlanan harcama" kavramı hiç yok — sadece gerçekleşmiş harcama modelleniyor. `requirements.md` §7 de finans dashboard'unun "bütçe vs. gerçekleşen" gösterdiğini söylüyor ama bu bütçe kategori bazlı, hedef/konu bazlı değil.
