@@ -19,6 +19,7 @@ import { useRequirements } from '../../hooks/useRequirements'
 import { useTopics } from '../../hooks/useTopics'
 import { usePlannedExpenses } from '../../hooks/usePlannedExpenses'
 import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
+import { useTopicTemplatesStore } from '../../stores/topicTemplatesStore'
 import { effectiveRequirementId } from '../../lib/taskHierarchy'
 import { AreaGoals } from './AreaGoals'
 import {
@@ -722,6 +723,8 @@ function NewTopicForm({
   onDone: () => void
 }) {
   const [name, setName] = useState('')
+  const [templateId, setTemplateId] = useState('')
+  const templates = useTopicTemplatesStore((s) => s.templates)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -732,7 +735,8 @@ function NewTopicForm({
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    await createTopic(uid, areaId, trimmed)
+    const template = templates.find((t) => t.id === templateId)
+    await createTopic(uid, areaId, trimmed, undefined, template?.sections)
     onDone()
   }
 
@@ -748,6 +752,19 @@ function NewTopicForm({
           placeholder="ör. Atölye Kurma"
           className={inputClass}
         />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-text-secondary">
+        Şablon
+        <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={inputClass}>
+          <option value="">Boş</option>
+          {templates
+            .filter((t) => !t.isBuiltIn || t.name !== 'Boş')
+            .map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+        </select>
       </label>
       <Button type="submit" variant="primary" size="sm">
         Ekle

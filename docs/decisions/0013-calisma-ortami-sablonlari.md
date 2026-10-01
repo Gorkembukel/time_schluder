@@ -27,3 +27,10 @@ Kullanıcı, konu oluşturulurken bir başlangıç yapısı (şablon) seçilebil
 - `config/topic-templates.ts` yeni config dosyası, `config-audit` kapsamına girer.
 - Bu ADR, tasarım dokümanındaki Faz 4'te uygulanır; Faz 1-3'te Konu'nun `sections` alanı kullanılmaz (boş/serbest liste olarak çalışır), şablon altyapısı geriye dönük uyumlu şekilde sonradan eklenir — mevcut hiçbir Konu kaydı bozulmaz.
 - Şablon değişikliği geçmişe dönük uygulanmaz; kullanıcı isterse mevcut bir konunun bölümlerini elle şablonun yeni haliyle hizalayabilir (otomatik değil).
+
+## Faz 4 uygulama notu (2026-10-01)
+Kullanıcıyla netleştirme: tüm bölümler ekranda aynı şekilde davranır — bir bölüm yalnızca adlandırılmış bir bilgi birimi grubudur, türe özgü bir render/veri modeli yoktur. Bu, orijinal kararın `TopicSection { id, kind, title, order, config? }` şemasını basitleştirir:
+- `kind`/`config?` alanları düşürüldü (kullanılmayan, spekülatif alan eklememe ilkesiyle) — gerçek şema: `{ id, title, order }`.
+- Bölüm sırası yeniden sıralanamaz (ADR'nin "ekle/çıkar/yeniden adlandır" listesi reorder içermiyordu); yeni bölümler sona eklenir.
+- Bir bölüm silindiğinde içeriği silinmez — atanmış bilgi birimleri "Sınıflandırılmamış" grubuna döner (`KnowledgeItem.sectionId` temizlenir).
+- Bilgi birimi oluşturulurken opsiyonel bir "Bölüm" seçiciyle atanır, sonradan düzenleme formundan değiştirilebilir.

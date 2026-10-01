@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
+  BookmarkPlus,
   ExternalLink,
+  FolderPlus,
   Lightbulb,
   Pencil,
   Plus,
@@ -10,19 +12,28 @@ import {
   Sparkles,
   Trash2,
   Waypoints,
+  X,
 } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useTopics } from '../../hooks/useTopics'
 import { useKnowledgeItems } from '../../hooks/useKnowledgeItems'
 import { useRequirements } from '../../hooks/useRequirements'
-import { renameTopic, updateTopicDescription, deleteTopic } from '../../services/repositories/topicsRepository'
+import {
+  renameTopic,
+  updateTopicDescription,
+  deleteTopic,
+  addTopicSection,
+  renameTopicSection,
+  deleteTopicSection,
+} from '../../services/repositories/topicsRepository'
 import {
   createKnowledgeItem,
   deleteKnowledgeItem,
   updateKnowledgeItem,
 } from '../../services/repositories/knowledgeItemsRepository'
 import { deriveRequirementFromNote } from '../../services/repositories/requirementsRepository'
+import { createTopicTemplateFromSections } from '../../services/repositories/topicTemplatesRepository'
 import { KNOWLEDGE_ITEM_TYPE_ICONS, isLinkType } from '../../config/knowledge-item-types'
 import {
   KNOWLEDGE_ITEM_TYPES,
@@ -36,6 +47,7 @@ import {
   type Requirement,
   type RequirementStatus,
   type RequirementType,
+  type TopicSection,
 } from '../../types/domain'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
@@ -45,6 +57,7 @@ import { EmptyState } from '../../components/EmptyState'
 import { PlanningCanvas } from '../kanvas/PlanningCanvas'
 
 const ICON_SIZE = 14
+const SMALL_ICON_SIZE = 10
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1.5 text-sm text-text'
 
 const TYPE_TINT: Record<KnowledgeItemType, string> = {
@@ -94,6 +107,8 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [showNewItem, setShowNewItem] = useState(false)
   const [search, setSearch] = useState('')
+  const [addingSection, setAddingSection] = useState(false)
+  const [savingTemplate, setSavingTemplate] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -112,6 +127,27 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
   }, [items, topicId, query])
 
   const topicRequirements = requirements.filter((r) => r.topicId === topicId)
+  const sections = useMemo(
+    () => [...(topic?.sections ?? [])].sort((a, b) => a.order - b.order),
+    [topic?.sections],
+  )
+  const sectionIds = new Set(sections.map((s) => s.id))
+  const groupedItems = useMemo(() => {
+    if (query) return null
+    const groups = new Map<string, KnowledgeItem[]>()
+    const unclassified: KnowledgeItem[] = []
+    for (const item of visibleItems) {
+      if (item.sectionId && sectionIds.has(item.sectionId)) {
+        const list = groups.get(item.sectionId) ?? []
+        list.push(item)
+        groups.set(item.sectionId, list)
+      } else {
+        unclassified.push(item)
+      }
+    }
+    return { groups, unclassified }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sectionIds her render'da yeni Set referansı alır, içeriği visibleItems/sections'tan türer
+  }, [visibleItems, query, sections])
 
   async function handleRenameTopic() {
     const trimmed = nameInputRef.current?.value.trim() ?? ''
@@ -130,6 +166,20 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
   async function handleDeleteTopic() {
     await deleteTopic(uid, areaId, topicId)
     navigate('/hayat-alanlari')
+  }
+
+  async function handleAddSection(title: string) {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    await addTopicSection(uid, areaId, topicId, sections, trimmed)
+    setAddingSection(false)
+  }
+
+  async function handleSaveAsTemplate(name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await createTopicTemplateFromSections(uid, trimmed, sections)
+    setSavingTemplate(false)
   }
 
   if (topicsLoading) {
@@ -275,6 +325,48 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
             </label>
           </div>
 
+          {!query && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {sections.map((section) => (
+                <SectionChip
+                  key={section.id}
+                  uid={uid}
+                  areaId={areaId}
+                  topicId={topicId}
+                  sections={sections}
+                  section={section}
+                />
+              ))}
+              {addingSection ? (
+                <InlineTextForm
+                  placeholder="Bölüm adı"
+                  submitLabel="Ekle"
+                  onSubmit={(value) => void handleAddSection(value)}
+                  onCancel={() => setAddingSection(false)}
+                />
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setAddingSection(true)}>
+                  <FolderPlus size={ICON_SIZE} />
+                  Bölüm ekle
+                </Button>
+              )}
+              {sections.length > 0 &&
+                (savingTemplate ? (
+                  <InlineTextForm
+                    placeholder="Şablon adı"
+                    submitLabel="Kaydet"
+                    onSubmit={(value) => void handleSaveAsTemplate(value)}
+                    onCancel={() => setSavingTemplate(false)}
+                  />
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={() => setSavingTemplate(true)}>
+                    <BookmarkPlus size={ICON_SIZE} />
+                    Yeni şablon olarak kaydet
+                  </Button>
+                ))}
+            </div>
+          )}
+
           {itemsLoading ? (
             <SkeletonLines count={3} className="h-24" />
           ) : visibleItems.length === 0 ? (
@@ -283,7 +375,7 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
               title={query ? 'Eşleşen bilgi birimi yok' : 'Henüz bilgi birimi yok'}
               description={query ? undefined : 'Not, link, kişi ya da tasarım kararı ekleyerek başla.'}
             />
-          ) : (
+          ) : !groupedItems || sections.length === 0 ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {visibleItems.map((item) => (
                 <KnowledgeItemCard
@@ -292,6 +384,7 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
                   areaId={areaId}
                   item={item}
                   requirements={requirements}
+                  sections={sections}
                   crossTopicLabel={
                     query && item.topicId !== topicId
                       ? topics.find((t) => t.id === item.topicId)?.name
@@ -300,10 +393,65 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
                 />
               ))}
             </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {sections.map((section) => {
+                const sectionItems = groupedItems.groups.get(section.id) ?? []
+                return (
+                  <div key={section.id}>
+                    <h3 className="mb-2 text-xs font-semibold text-text-secondary">
+                      {section.title}{' '}
+                      <span className="font-normal normal-case">({sectionItems.length})</span>
+                    </h3>
+                    {sectionItems.length === 0 ? (
+                      <p className="text-xs text-text-secondary">Bu bölümde henüz bilgi birimi yok.</p>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {sectionItems.map((item) => (
+                          <KnowledgeItemCard
+                            key={item.id}
+                            uid={uid}
+                            areaId={areaId}
+                            item={item}
+                            requirements={requirements}
+                            sections={sections}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {groupedItems.unclassified.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold text-text-secondary">
+                    Sınıflandırılmamış{' '}
+                    <span className="font-normal normal-case">({groupedItems.unclassified.length})</span>
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {groupedItems.unclassified.map((item) => (
+                      <KnowledgeItemCard
+                        key={item.id}
+                        uid={uid}
+                        areaId={areaId}
+                        item={item}
+                        requirements={requirements}
+                        sections={sections}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {showNewItem ? (
-            <NewKnowledgeItemForm uid={uid} topicId={topicId} onDone={() => setShowNewItem(false)} />
+            <NewKnowledgeItemForm
+              uid={uid}
+              topicId={topicId}
+              sections={sections}
+              onDone={() => setShowNewItem(false)}
+            />
           ) : (
             <Button variant="ghost" size="sm" onClick={() => setShowNewItem(true)} className="w-fit">
               <Plus size={ICON_SIZE} />
@@ -348,6 +496,7 @@ function KnowledgeItemCard({
   areaId,
   item,
   requirements,
+  sections,
   crossTopicLabel,
 }: {
   uid: string
@@ -355,6 +504,8 @@ function KnowledgeItemCard({
   item: KnowledgeItem
   /** Türetilen gerekliliklerin adını göstermek için — bu alanın tüm gereklilikleri. */
   requirements: Requirement[]
+  /** Düzenleme formundaki "Bölüm" seçicisi için — konunun bölümleri. */
+  sections: TopicSection[]
   crossTopicLabel?: string
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -371,6 +522,7 @@ function KnowledgeItemCard({
       <NewKnowledgeItemForm
         uid={uid}
         topicId={item.topicId}
+        sections={sections}
         initial={item}
         onDone={() => setEditing(false)}
       />
@@ -609,17 +761,21 @@ function DeriveRequirementForm({
 function NewKnowledgeItemForm({
   uid,
   topicId,
+  sections,
   initial,
   onDone,
 }: {
   uid: string
   topicId: string
+  /** Konunun bölümleri — opsiyonel "Bölüm" seçicisini doldurmak için. */
+  sections: TopicSection[]
   initial?: KnowledgeItem
   onDone: () => void
 }) {
   const [type, setType] = useState<KnowledgeItemType>(initial?.type ?? 'not')
   const [title, setTitle] = useState(initial?.title ?? '')
   const [body, setBody] = useState(initial?.body ?? '')
+  const [sectionId, setSectionId] = useState(initial?.sectionId ?? '')
   const [isExperienceNote, setIsExperienceNote] = useState(initial?.isExperienceNote ?? false)
   const titleRef = useRef<HTMLInputElement>(null)
 
@@ -638,6 +794,7 @@ function NewKnowledgeItemForm({
         type,
         title: trimmedTitle,
         body: trimmedBody,
+        sectionId,
         isExperienceNote,
       })
     } else {
@@ -646,6 +803,7 @@ function NewKnowledgeItemForm({
         title: trimmedTitle,
         body: trimmedBody,
         topicId,
+        sectionId: sectionId || undefined,
         isExperienceNote,
       })
     }
@@ -665,6 +823,19 @@ function NewKnowledgeItemForm({
             ))}
           </select>
         </label>
+        {sections.length > 0 && (
+          <label className="flex flex-col gap-1 text-xs text-text-secondary">
+            Bölüm
+            <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} className={inputClass}>
+              <option value="">—</option>
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-text-secondary">
           Başlık
           <input
@@ -701,5 +872,126 @@ function NewKnowledgeItemForm({
         </Button>
       </form>
     </Card>
+  )
+}
+
+function SectionChip({
+  uid,
+  areaId,
+  topicId,
+  sections,
+  section,
+}: {
+  uid: string
+  areaId: string
+  topicId: string
+  /** Rename/silme işlemleri Firestore'a dizinin tamamını yazdığı için konunun güncel bölüm listesi. */
+  sections: TopicSection[]
+  section: TopicSection
+}) {
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(section.title)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingName) inputRef.current?.focus()
+  }, [editingName])
+
+  async function handleRename() {
+    const trimmed = nameDraft.trim()
+    if (trimmed && trimmed !== section.title) {
+      await renameTopicSection(uid, areaId, topicId, sections, section.id, trimmed)
+    } else {
+      setNameDraft(section.title)
+    }
+    setEditingName(false)
+  }
+
+  if (editingName) {
+    return (
+      <input
+        ref={inputRef}
+        value={nameDraft}
+        onChange={(e) => setNameDraft(e.target.value)}
+        onBlur={() => void handleRename()}
+        onKeyDown={(e) => e.key === 'Enter' && void handleRename()}
+        className="rounded-full border border-border bg-bg px-2.5 py-1 text-xs text-text"
+      />
+    )
+  }
+
+  return (
+    <span className="flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-text-secondary">
+      <button type="button" onClick={() => setEditingName(true)} className="hover:text-text">
+        {section.title}
+      </button>
+      {confirmingDelete ? (
+        <span className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void deleteTopicSection(uid, areaId, topicId, sections, section.id)}
+            className="text-danger"
+          >
+            Sil
+          </button>
+          <button type="button" onClick={() => setConfirmingDelete(false)} className="hover:text-text">
+            Vazgeç
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmingDelete(true)}
+          aria-label={`${section.title} bölümünü sil`}
+          className="hover:text-danger"
+        >
+          <X size={SMALL_ICON_SIZE} />
+        </button>
+      )}
+    </span>
+  )
+}
+
+function InlineTextForm({
+  placeholder,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: {
+  placeholder: string
+  submitLabel: string
+  onSubmit: (value: string) => void
+  onCancel: () => void
+}) {
+  const [value, setValue] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!value.trim()) return
+    onSubmit(value)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center gap-1">
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+        className="rounded-lg border border-border bg-bg px-2 py-1 text-xs text-text"
+      />
+      <Button type="submit" variant="primary" size="sm">
+        {submitLabel}
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onCancel}>
+        Vazgeç
+      </Button>
+    </form>
   )
 }

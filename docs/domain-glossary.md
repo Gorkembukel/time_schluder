@@ -64,18 +64,19 @@ Jira eşlemesi (bkz. `.claude/personas/jira-developer.md`). Her iş bir üst öl
 | Gereklilik türü | Sabit liste: Bilgi, Beceri, İlişki/Ağ, Finansal kaynak, Varlık/Araç, Belge/Yetkinlik, Alışkanlık, Sağlık/Enerji, Deneyim |
 
 ## Konu ve çalışma ortamı katmanı
-Bilgi ve kaynak katmanı tasarımı, bkz. `docs/decisions/0009`–`0013` ve `docs/bilgi-kaynak-katmani-tasarim.md`. Konu, Çalışma ortamı ve Bilgi birimi Faz 1'de uygulanmıştır. Deneyim notu, Envanter durumu, Boşluk analizi, Planlı harcama ve Çalışma ortamı şablonu henüz uygulanmamış Faz 2-4 kavramlarıdır, `(taslak)` işaretlidir.
+Bilgi ve kaynak katmanı tasarımı, bkz. `docs/decisions/0009`–`0013` ve `docs/bilgi-kaynak-katmani-tasarim.md`. Faz 1-4 tamamlandı; bu katmandaki tüm terimler uygulanmış durumda.
 
 | Terim | Tanım |
 |---|---|
 | Konu | Bir hayat alanına bağlı, zamana bağlı olmayan kalıcı çalışma alanı. Epic/Story/Task zaman hiyerarşisine **dik bir bağlamdır, hiyerarşide bir seviye değildir** — Jira'daki "Component" kavramına benzer: bir işe (Task) birden çok konu etiketlenebilir, konunun kendisi zamandan bağımsızdır (bkz. ADR 0009) |
 | Çalışma ortamı | Bir konunun barındırdığı içeriğin tümü: bilgi birimleri, gerekliliklerin envanter durumu, deneyim notları, planlı harcamalar, ilgili işler |
 | Bilgi birimi | Görev olmayan, konunun çalışma ortamında biriken kayıt: not, link, doküman, kişi, tasarım kararı; bir işe veya gerekliliğe iliştirilebilir, türleri config'de tanımlıdır (bkz. ADR 0010) |
-| Deneyim notu | Bir bilgi biriminin alt türü; bir işe bağlı veya bağımsız retrospektif kayıt; tek adımda yeni bir gerekliliğe dönüştürülebilir (türetme); kaynak not ile türeyen gereklilik arasındaki bağ iki yönlüdür (taslak, bkz. ADR 0011) |
-| Envanter durumu | Bir gerekliliğin "elimde ne var" boyutu: yok / alınacak / var / edinildi (değerler config'de); mevcut sayısal ilerleme (`currentValue`/`targetMetric`) alanının yerine değil, yanına eklenir (taslak, bkz. ADR 0011) |
-| Boşluk analizi | Bir konu veya hedef kapsamındaki, envanter durumu eksik ya da ilerlemesi düşük gerekliliklerin listelendiği görünüm (taslak) |
-| Planlı harcama | Fiyatlı (`estimatedCost`) ve durumu "alınacak" olan bir gerekliliğe bağlı, henüz gerçekleşmemiş harcama kaydı; satın alınınca bir finans işlemine dönüşür ve gerekliliğin envanter durumu için öneri üretir (taslak, bkz. ADR 0012) |
-| Çalışma ortamı şablonu | Bir konu oluşturulurken kopyalanan başlangıç bölüm/alan yapısı (ör. Müfredat, Envanter, Proje kataloğu, Boş); konuya kopyalanır (snapshot), şablon sonradan değişse mevcut konular etkilenmez (taslak, bkz. ADR 0013) |
+| Deneyim notu | Bir bilgi biriminin alt türü; bir işe bağlı veya bağımsız retrospektif kayıt; tek adımda yeni bir gerekliliğe dönüştürülebilir (türetme); kaynak not ile türeyen gereklilik arasındaki bağ iki yönlüdür (bkz. ADR 0011) |
+| Envanter durumu | Bir gerekliliğin "elimde ne var" boyutu: yok / alınacak / var / edinildi (değerler config'de); mevcut sayısal ilerleme (`currentValue`/`targetMetric`) alanının yerine değil, yanına eklenir (bkz. ADR 0011) |
+| Boşluk analizi | Bir konu veya hedef kapsamındaki, envanter durumu eksik ya da ilerlemesi düşük gerekliliklerin listelendiği görünüm |
+| Planlı harcama | Fiyatlı (`estimatedCost`) ve durumu "alınacak" olan bir gerekliliğe bağlı, henüz gerçekleşmemiş harcama kaydı; satın alınınca bir finans işlemine dönüşür ve gerekliliğin envanter durumu için öneri üretir (bkz. ADR 0012) |
+| Bölüm (section) | Bir konunun bilgi birimlerini gruplayan, yalnızca adlandırılmış bir küme — tüm bölümler aynı şekilde render edilir, türe özgü davranış yoktur; ekle/çıkar/yeniden adlandır serbest (bkz. ADR 0013) |
+| Çalışma ortamı şablonu | Bir konu oluşturulurken seçilebilen başlangıç bölüm listesi (Boş, Müfredat, Envanter, Proje kataloğu, veya kullanıcının "Yeni şablon olarak kaydet" ile eklediği özel şablonlar); konuya kopyalanır (snapshot), şablon sonradan değişse mevcut konular etkilenmez (bkz. ADR 0013) |
 
 ## Finans
 | Terim | Tanım |

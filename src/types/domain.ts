@@ -107,13 +107,33 @@ export interface Requirement {
  * hiyerarşisine dik bir bağlamdır, hiyerarşide bir seviye değildir (Jira "Component" analojisi,
  * bkz. docs/decisions/0009). Bilgi birimleri ve gereklilikler buraya bağlanır.
  */
+/** Konunun çalışma ortamındaki bir bilgi birimi grubu — tüm bölümler aynı şekilde render edilir, yalnızca adlandırılmış bir kümedir (bkz. docs/decisions/0013). */
+export interface TopicSection {
+  id: string
+  title: string
+  order: number
+}
+
 export interface Topic {
   id: string
   lifeAreaId: string
   name: string
   description?: string
+  /** Konu oluşturulurken seçilen şablondan kopyalanır (snapshot); sonradan serbestçe düzenlenir (bkz. docs/decisions/0013). */
+  sections?: TopicSection[]
   createdAt: string
   updatedAt: string
+}
+
+/**
+ * Konu oluşturulurken kopyalanan başlangıç bölüm yapısı — seed (`config/topic-templates.ts`) veya
+ * kullanıcının "Yeni şablon olarak kaydet" ile kaydettiği özel şablon (bkz. docs/decisions/0013).
+ */
+export interface TopicTemplate {
+  id: string
+  name: string
+  sections: Omit<TopicSection, 'id'>[]
+  isBuiltIn: boolean
 }
 
 /** Ayarlardan düzenlenebilir — Gereklilik türünün aksine ürün kararıyla sabitlenmedi (bkz. docs/decisions/0010). */
@@ -136,6 +156,8 @@ export interface KnowledgeItem {
   /** `not`/`kisi`/`tasarim-karari` için serbest metin; `link`/`dokuman` için URL. */
   body: string
   topicId: string
+  /** Konunun `sections` listesindeki bir bölüme atama — opsiyonel, boşsa "Sınıflandırılmamış" grubunda görünür (bkz. docs/decisions/0013). */
+  sectionId?: string
   taskId?: string
   requirementId?: string
   /** Deneyim/retrospektif notu işareti — "Gerekliliğe dönüştür" aksiyonu bunlarda gösterilir. */
