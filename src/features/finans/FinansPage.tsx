@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Wallet, X } from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useTransactions } from '../../hooks/useTransactions'
+import { usePlannedExpenses } from '../../hooks/usePlannedExpenses'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { deleteTransaction } from '../../services/repositories/financeTransactionsRepository'
@@ -9,6 +10,9 @@ import { formatTRY } from '../../lib/format'
 import { TransactionForm } from './TransactionForm'
 import { MagnitudeBreakdown } from './MagnitudeBreakdown'
 import { BudgetComparison } from './BudgetComparison'
+import { PlannedExpensesList } from './PlannedExpensesList'
+import { PlannedVsActualCard } from './PlannedVsActualCard'
+import { ValueTrendChart } from './ValueTrendChart'
 import { SkeletonLines } from '../../components/Skeleton'
 import { PageHeader } from '../../components/PageHeader'
 import { Card } from '../../components/Card'
@@ -27,6 +31,7 @@ function currentMonthPrefix(): string {
 export function FinansPage() {
   const uid = useUid()
   const { transactions, loading } = useTransactions(uid)
+  const { plannedExpenses } = usePlannedExpenses(uid)
   const categories = useFinanceCategoriesStore((s) => s.categories)
   const areas = useLifeAreasStore((s) => s.areas)
   const [formKey, setFormKey] = useState(0)
@@ -39,6 +44,8 @@ export function FinansPage() {
   const monthExpenses = transactions.filter(
     (tx) => tx.type === 'expense' && tx.date.startsWith(monthPrefix),
   )
+  const expenseTransactions = transactions.filter((tx) => tx.type === 'expense')
+  const trackedPurchases = expenseTransactions.filter((tx) => tx.plannedExpenseId)
 
   const categoryBreakdown = buildBreakdown(monthExpenses, (tx) => tx.categoryId, categoryName)
   const areaBreakdown = buildBreakdown(monthExpenses, (tx) => tx.lifeAreaId, areaName)
@@ -86,6 +93,29 @@ export function FinansPage() {
       </div>
 
       <BudgetComparison categories={categories} monthExpenses={monthExpenses} />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <PlannedExpensesList />
+        <PlannedVsActualCard
+          plannedExpenses={plannedExpenses}
+          transactions={transactions}
+          areaName={areaName}
+        />
+      </div>
+
+      <ValueTrendChart
+        title="Aldıklarımın değer değişimi (planlı harcamalardan)"
+        transactions={trackedPurchases}
+        emptyText="Henüz bir planlı harcamayı 'satın alındı' olarak işaretlemedin."
+        defaultMode="individual"
+      />
+
+      <ValueTrendChart
+        title="Genel harcamalar — değer değişimi (overview)"
+        transactions={expenseTransactions}
+        emptyText="Henüz gider işlemi yok."
+        defaultMode="cumulative"
+      />
 
       <Card className="p-5">
         <h2 className="text-sm font-semibold text-text">Son işlemler</h2>

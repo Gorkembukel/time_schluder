@@ -6,8 +6,9 @@ import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useRequirements } from '../../hooks/useRequirements'
 import { useFxSnapshot } from '../../hooks/useFxSnapshot'
 import { createTransaction } from '../../services/repositories/financeTransactionsRepository'
+import { markPlannedExpensePurchased } from '../../services/repositories/plannedExpensesRepository'
 import { Button } from '../../components/Button'
-import type { NeedWant, TransactionType } from '../../types/domain'
+import type { NeedWant, PlannedExpense, TransactionType } from '../../types/domain'
 
 const inputClass = 'rounded-lg border border-border bg-bg px-2 py-1.5 text-sm text-text'
 const ISO_DATE_LENGTH = 10
@@ -22,7 +23,18 @@ function toNumberOrNull(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export function TransactionForm({ onCreated }: { onCreated: () => void }) {
+/**
+ * `purchasing` verilirse form o planlı harcamanın tutar/açıklama/hayat alanı/gereklilik
+ * alanlarıyla önceden doldurulur; kaydedilince planlı harcama "gerçekleşti" olarak
+ * işaretlenir ve işleme geri bağlanır (bkz. docs/decisions/0012, "Satın alındı" akışı).
+ */
+export function TransactionForm({
+  onCreated,
+  purchasing,
+}: {
+  onCreated: () => void
+  purchasing?: PlannedExpense
+}) {
   const uid = useUid()
   const categories = useFinanceCategoriesStore((s) => s.categories)
   const areas = useLifeAreasStore((s) => s.areas)
@@ -31,10 +43,10 @@ export function TransactionForm({ onCreated }: { onCreated: () => void }) {
   const [type, setType] = useState<TransactionType>('expense')
   const [categoryId, setCategoryId] = useState('')
   const [date, setDate] = useState(todayIsoDate())
-  const [amount, setAmount] = useState('')
-  const [description, setDescription] = useState('')
-  const [lifeAreaId, setLifeAreaId] = useState('')
-  const [requirementId, setRequirementId] = useState('')
+  const [amount, setAmount] = useState(purchasing ? String(purchasing.estimatedAmountTRY) : '')
+  const [description, setDescription] = useState(purchasing?.description ?? '')
+  const [lifeAreaId, setLifeAreaId] = useState(purchasing?.lifeAreaId ?? '')
+  const [requirementId, setRequirementId] = useState(purchasing?.requirementId ?? '')
   const [needWant, setNeedWant] = useState<NeedWant | ''>('')
   // null = kullanıcı henüz elle değiştirmedi -> otomatik çekilen değer gösterilir (varsa).
   const [usdRateOverride, setUsdRateOverride] = useState<string | null>(null)
@@ -62,7 +74,7 @@ export function TransactionForm({ onCreated }: { onCreated: () => void }) {
     const amountValue = Number(amount)
     if (!categoryId || !Number.isFinite(amountValue) || amountValue <= 0) return
 
-    await createTransaction(uid, {
+    const newTransactionId = await createTransaction(uid, {
       type,
       amountTRY: amountValue,
       categoryId,
@@ -78,7 +90,12 @@ export function TransactionForm({ onCreated }: { onCreated: () => void }) {
         source: fxSource,
         fetchedAt: fx.fetchedAt || new Date().toISOString(),
       },
+      plannedExpenseId: purchasing?.id,
     })
+
+    if (purchasing) {
+      await markPlannedExpensePurchased(uid, purchasing.id, newTransactionId)
+    }
 
     setCategoryId('')
     setAmount('')

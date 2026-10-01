@@ -28,6 +28,14 @@ vi.mock('../../services/repositories/topicsRepository', () => ({
   deleteTopic: vi.fn(),
 }))
 
+vi.mock('../../services/repositories/plannedExpensesRepository', () => ({
+  subscribePlannedExpenses: vi.fn(() => () => {}),
+  createPlannedExpense: vi.fn(),
+  updatePlannedExpenseStatus: vi.fn(),
+  markPlannedExpensePurchased: vi.fn(),
+  deletePlannedExpense: vi.fn(),
+}))
+
 import { createLifeArea } from '../../services/repositories/lifeAreasRepository'
 
 function renderPage() {

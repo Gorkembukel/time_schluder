@@ -277,6 +277,36 @@ export interface FinanceTransaction {
   requirementId?: string
   needWant?: NeedWant
   fxSnapshot: FxSnapshot
+  /** Bu işlemin doğduğu planlı harcama — ters referans, raporlama için (bkz. docs/decisions/0012). */
+  plannedExpenseId?: string
+}
+
+/** Ayarlardan düzenlenebilir — ürün kararıyla sabitlenmedi (bkz. docs/decisions/0012). */
+export const PLANNED_EXPENSE_STATUSES = ['planlandi', 'gerceklesti', 'iptal'] as const
+export type PlannedExpenseStatus = (typeof PLANNED_EXPENSE_STATUSES)[number]
+
+export const PLANNED_EXPENSE_STATUS_LABELS: Record<PlannedExpenseStatus, string> = {
+  planlandi: 'Planlandı',
+  gerceklesti: 'Gerçekleşti',
+  iptal: 'İptal',
+}
+
+/**
+ * Fiyatlı bir gereklilikten doğan, henüz gerçekleşmemiş harcama — "satın alındı"
+ * aksiyonuyla bir FinanceTransaction'a dönüşür (bkz. docs/decisions/0012).
+ */
+export interface PlannedExpense {
+  id: string
+  requirementId: string
+  lifeAreaId: string
+  topicId?: string
+  description: string
+  estimatedAmountTRY: number
+  plannedDate?: string
+  status: PlannedExpenseStatus
+  linkedTransactionId?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface FinanceCategory {

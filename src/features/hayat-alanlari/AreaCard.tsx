@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, ChevronRight, Layers, Plus, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronRight, Layers, Plus, Trash2, Wallet } from 'lucide-react'
 import {
   deleteLifeArea,
   renameLifeArea,
@@ -13,21 +13,25 @@ import {
   updateRequirementDetails,
   updateRequirementProgress,
 } from '../../services/repositories/requirementsRepository'
+import { createPlannedExpense } from '../../services/repositories/plannedExpensesRepository'
 import { createTopic, deleteTopic, renameTopic } from '../../services/repositories/topicsRepository'
 import { useRequirements } from '../../hooks/useRequirements'
 import { useTopics } from '../../hooks/useTopics'
+import { usePlannedExpenses } from '../../hooks/usePlannedExpenses'
 import { useTaskHierarchy } from '../../hooks/useTaskHierarchy'
 import { effectiveRequirementId } from '../../lib/taskHierarchy'
 import { AreaGoals } from './AreaGoals'
 import {
   LIFE_AREA_PRIORITIES,
   LIFE_AREA_PRIORITY_LABELS,
+  PLANNED_EXPENSE_STATUS_LABELS,
   REQUIREMENT_STATUSES,
   REQUIREMENT_STATUS_LABELS,
   REQUIREMENT_TYPES,
   REQUIREMENT_TYPE_LABELS,
   type LifeAreaPriority,
   type LifeArea,
+  type PlannedExpense,
   type Requirement,
   type RequirementStatus,
   type RequirementType,
@@ -56,6 +60,7 @@ const DEPTH_INDENT_REM = 0.5
 export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
   const { requirements, loading } = useRequirements(uid, area.id)
   const { topics, loading: topicsLoading } = useTopics(uid, area.id)
+  const { plannedExpenses } = usePlannedExpenses(uid, area.id)
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(area.name)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -225,6 +230,7 @@ export function AreaCard({ uid, area }: { uid: string; area: LifeArea }) {
                   requirement={requirement}
                   all={requirements}
                   topics={topics}
+                  plannedExpenses={plannedExpenses}
                 />
               ))
             )}
@@ -295,6 +301,7 @@ function RequirementNode({
   requirement,
   all,
   topics,
+  plannedExpenses,
   depth = 0,
 }: {
   uid: string
@@ -304,17 +311,36 @@ function RequirementNode({
   all: Requirement[]
   /** Konu badge'i ve alt gereklilik formundaki "Konu" seçici için. */
   topics: Topic[]
+  /** Alanın tüm planlı harcamaları — "Planlı harcama oluştur" aksiyonunun tekrarını önlemek için. */
+  plannedExpenses: PlannedExpense[]
   depth?: number
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [showAddChild, setShowAddChild] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [creatingPlannedExpense, setCreatingPlannedExpense] = useState(false)
   const { tasks, index } = useTaskHierarchy()
   const linkedTasks = tasks.filter((t) => effectiveRequirementId(t, index) === requirement.id)
   const linkedDone = linkedTasks.filter((t) => t.status === 'done').length
   const kids = childrenOf(all, requirement.id)
   const isParent = kids.length > 0
   const progress = requirementProgress(requirement, all)
+  const ownPlannedExpense = plannedExpenses.find(
+    (p) => p.requirementId === requirement.id && p.status !== 'iptal',
+  )
+
+  async function handleCreatePlannedExpense() {
+    if (!requirement.estimatedCost) return
+    setCreatingPlannedExpense(true)
+    await createPlannedExpense(uid, {
+      requirementId: requirement.id,
+      lifeAreaId: areaId,
+      topicId: requirement.topicId,
+      description: requirement.name,
+      estimatedAmountTRY: requirement.estimatedCost,
+    })
+    setCreatingPlannedExpense(false)
+  }
 
   async function handleDelete() {
     if (isParent) {
@@ -456,6 +482,25 @@ function RequirementNode({
                 className="w-36 rounded-lg border border-border bg-bg px-1.5 py-0.5 text-xs text-text"
               />
             </label>
+            {ownPlannedExpense ? (
+              <Badge variant={ownPlannedExpense.status === 'gerceklesti' ? 'success' : 'warning'}>
+                <Wallet size={ICON_SIZE} />
+                {PLANNED_EXPENSE_STATUS_LABELS[ownPlannedExpense.status]}
+              </Badge>
+            ) : (
+              requirement.status === 'alinacak' &&
+              !!requirement.estimatedCost && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={creatingPlannedExpense}
+                  onClick={() => void handleCreatePlannedExpense()}
+                >
+                  <Wallet size={ICON_SIZE} />
+                  Planlı harcama oluştur
+                </Button>
+              )
+            )}
           </div>
         )}
       </div>
@@ -482,6 +527,7 @@ function RequirementNode({
               requirement={child}
               all={all}
               topics={topics}
+              plannedExpenses={plannedExpenses}
               depth={depth + 1}
             />
           ))}

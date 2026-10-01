@@ -87,6 +87,17 @@ vi.mock('../services/repositories/requirementsRepository', () => ({
   deleteRequirement: vi.fn(),
 }))
 
+vi.mock('../services/repositories/plannedExpensesRepository', () => ({
+  subscribePlannedExpenses: (_uid: string, onChange: (items: unknown[]) => void) => {
+    onChange([])
+    return () => {}
+  },
+  createPlannedExpense: vi.fn(),
+  updatePlannedExpenseStatus: vi.fn(),
+  markPlannedExpensePurchased: vi.fn(),
+  deletePlannedExpense: vi.fn(),
+}))
+
 vi.mock('../services/repositories/routinesRepository', () => ({
   subscribeRoutines: (_uid: string, onChange: (routines: unknown[]) => void) => {
     onChange([])
