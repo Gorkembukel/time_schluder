@@ -16,6 +16,13 @@
   --success: #2f9e44;
   --warning: #e8590c;
   --danger: #e03131;
+  /* Grafik kategorik serisi (dataviz skill validated default, ilk 4 slot: blue/orange/aqua/yellow) —
+     ValueTrendChart'ta kategori çizgileri için; başarı/tehlike token'larıyla karışmasın diye
+     ayrı tutulur. scripts/validate_palette.js ile surface #ffffff'e karşı doğrulandı. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,6 +37,10 @@
     --success: #69db7c;
     --warning: #ffa94d;
     --danger: #ff8787;
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
   }
 }
 
@@ -44,4 +55,8 @@
   --success: #69db7c;
   --warning: #ffa94d;
   --danger: #ff8787;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
 }

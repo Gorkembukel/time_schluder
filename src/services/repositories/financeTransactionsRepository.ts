@@ -43,10 +43,14 @@ export interface NewTransactionInput {
   requirementId?: string
   needWant?: NeedWant
   fxSnapshot: FxSnapshot
+  /** Bu işlem bir planlı harcamanın "satın alındı" aksiyonundan doğduysa (bkz. docs/decisions/0012). */
+  plannedExpenseId?: string
 }
 
-export async function createTransaction(uid: string, input: NewTransactionInput): Promise<void> {
-  await addDoc(transactionsCollectionRef(uid), input)
+/** Oluşturulan belgenin id'sini döner — planlı harcama akışında geri bağ kurmak için (ADR 0012). */
+export async function createTransaction(uid: string, input: NewTransactionInput): Promise<string> {
+  const ref = await addDoc(transactionsCollectionRef(uid), input)
+  return ref.id
 }
 
 export async function deleteTransaction(uid: string, transactionId: string): Promise<void> {
