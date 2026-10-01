@@ -106,15 +106,15 @@ export function FinansPage() {
       <ValueTrendChart
         title="Aldıklarımın değer değişimi (planlı harcamalardan)"
         transactions={trackedPurchases}
+        categories={categories}
         emptyText="Henüz bir planlı harcamayı 'satın alındı' olarak işaretlemedin."
-        defaultMode="individual"
       />
 
       <ValueTrendChart
-        title="Genel harcamalar — değer değişimi (overview)"
-        transactions={expenseTransactions}
-        emptyText="Henüz gider işlemi yok."
-        defaultMode="cumulative"
+        title="Genel harcamalar ve gelirler — değer değişimi (overview)"
+        transactions={transactions}
+        categories={categories}
+        emptyText="Henüz işlem yok."
       />
 
       <Card className="p-5">
