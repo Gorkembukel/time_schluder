@@ -3,6 +3,8 @@ import { Settings as SettingsIcon } from 'lucide-react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useFinanceCategoriesStore } from '../../stores/financeCategoriesStore'
 import { updateCategoryBudget } from '../../services/repositories/financeCategoriesRepository'
+import { useTopicTemplatesStore } from '../../stores/topicTemplatesStore'
+import { deleteTopicTemplate } from '../../services/repositories/topicTemplatesRepository'
 import { useUid } from '../../app/UidContext'
 import { Skeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/PageHeader'
@@ -76,6 +78,7 @@ export function AyarlarPage() {
   const loading = useSettingsStore((s) => s.loading)
   const update = useSettingsStore((s) => s.update)
   const categories = useFinanceCategoriesStore((s) => s.categories)
+  const templates = useTopicTemplatesStore((s) => s.templates)
 
   if (loading) {
     return (
@@ -379,6 +382,39 @@ export function AyarlarPage() {
             }
           />
         </Field>
+      </Section>
+
+      <Section title="Konu Şablonları">
+        {templates.length === 0 ? (
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-6 w-20" />
+            <Skeleton className="h-6 w-24" />
+          </div>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {templates.map((template) => (
+              <li
+                key={template.id}
+                className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-text-secondary"
+              >
+                {template.name}
+                {!template.isBuiltIn && (
+                  <button
+                    type="button"
+                    onClick={() => void deleteTopicTemplate(uid, template.id)}
+                    aria-label={`${template.name} şablonunu sil`}
+                    className="text-text-secondary hover:text-danger"
+                  >
+                    ×
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-sm text-text-secondary">
+          Yeni şablon bir konunun çalışma ortamından "Yeni şablon olarak kaydet" ile eklenir.
+        </p>
       </Section>
 
       <Section title="Finans — Kategoriler">

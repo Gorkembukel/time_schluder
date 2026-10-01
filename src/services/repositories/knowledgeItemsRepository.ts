@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   limit,
   onSnapshot,
@@ -40,6 +41,7 @@ export interface NewKnowledgeItemInput {
   title: string
   body: string
   topicId: string
+  sectionId?: string
   taskId?: string
   requirementId?: string
   isExperienceNote?: boolean
@@ -59,15 +61,20 @@ export async function createKnowledgeItem(
 
 export type KnowledgeItemFieldsUpdate = Partial<
   Pick<KnowledgeItem, 'type' | 'title' | 'body' | 'isExperienceNote'>
->
+> & {
+  /** `''` verilirse bölüm ataması kaldırılır (belgeden silinir), bkz. docs/decisions/0013. */
+  sectionId?: string
+}
 
 export async function updateKnowledgeItem(
   uid: string,
   itemId: string,
   fields: KnowledgeItemFieldsUpdate,
 ): Promise<void> {
+  const { sectionId, ...rest } = fields
   await updateDoc(doc(db, 'users', uid, 'knowledgeItems', itemId), {
-    ...fields,
+    ...rest,
+    ...(sectionId !== undefined && { sectionId: sectionId === '' ? deleteField() : sectionId }),
     updatedAt: new Date().toISOString(),
   })
 }

@@ -14,7 +14,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { Topic } from '../../types/domain'
+import type { Topic, TopicSection } from '../../types/domain'
 
 function topicsCollectionRef(uid: string, areaId: string) {
   return collection(db, 'users', uid, 'lifeAreas', areaId, 'topics')
@@ -35,20 +35,84 @@ export function subscribeTopics(
   })
 }
 
+/** `templateSections` verilirse (bkz. docs/decisions/0013), her bölüme taze bir id atanarak konuya kopyalanır (snapshot). */
 export async function createTopic(
   uid: string,
   areaId: string,
   name: string,
   description?: string,
+  templateSections?: Omit<TopicSection, 'id'>[],
 ): Promise<void> {
   const now = new Date().toISOString()
+  const sections = templateSections?.map((section) => ({
+    ...section,
+    id: doc(topicsCollectionRef(uid, areaId)).id,
+  }))
   await addDoc(topicsCollectionRef(uid, areaId), {
     lifeAreaId: areaId,
     name,
     description: description || undefined,
+    sections: sections && sections.length > 0 ? sections : undefined,
     createdAt: now,
     updatedAt: now,
   })
+}
+
+/** Yeni bir bölüm ekler — mevcut `sections` dizisi çağıran tarafından verilir (Firestore array alanı bütün olarak yazılır). */
+export async function addTopicSection(
+  uid: string,
+  areaId: string,
+  topicId: string,
+  currentSections: TopicSection[],
+  title: string,
+): Promise<void> {
+  const newSection: TopicSection = {
+    id: doc(topicsCollectionRef(uid, areaId)).id,
+    title,
+    order: currentSections.length,
+  }
+  await updateDoc(doc(db, 'users', uid, 'lifeAreas', areaId, 'topics', topicId), {
+    sections: [...currentSections, newSection],
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export async function renameTopicSection(
+  uid: string,
+  areaId: string,
+  topicId: string,
+  sections: TopicSection[],
+  sectionId: string,
+  title: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', uid, 'lifeAreas', areaId, 'topics', topicId), {
+    sections: sections.map((s) => (s.id === sectionId ? { ...s, title } : s)),
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+/** Bölümü siler; o bölüme atanmış bilgi birimleri silinmez, "Sınıflandırılmamış" grubuna döner. */
+export async function deleteTopicSection(
+  uid: string,
+  areaId: string,
+  topicId: string,
+  sections: TopicSection[],
+  sectionId: string,
+): Promise<void> {
+  const itemsSnap = await getDocs(
+    query(
+      collection(db, 'users', uid, 'knowledgeItems'),
+      where('topicId', '==', topicId),
+      where('sectionId', '==', sectionId),
+    ),
+  )
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'users', uid, 'lifeAreas', areaId, 'topics', topicId), {
+    sections: sections.filter((s) => s.id !== sectionId),
+    updatedAt: new Date().toISOString(),
+  })
+  for (const d of itemsSnap.docs) batch.update(d.ref, { sectionId: deleteField() })
+  await batch.commit()
 }
 
 export async function renameTopic(

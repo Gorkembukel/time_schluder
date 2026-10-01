@@ -98,6 +98,16 @@ vi.mock('../services/repositories/plannedExpensesRepository', () => ({
   deletePlannedExpense: vi.fn(),
 }))
 
+vi.mock('../services/repositories/topicTemplatesRepository', () => ({
+  seedDefaultTopicTemplatesIfMissing: vi.fn().mockResolvedValue(undefined),
+  subscribeTopicTemplates: (_uid: string, onChange: (templates: unknown[]) => void) => {
+    onChange([])
+    return () => {}
+  },
+  createTopicTemplateFromSections: vi.fn(),
+  deleteTopicTemplate: vi.fn(),
+}))
+
 vi.mock('../services/repositories/routinesRepository', () => ({
   subscribeRoutines: (_uid: string, onChange: (routines: unknown[]) => void) => {
     onChange([])

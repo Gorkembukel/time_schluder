@@ -4,6 +4,7 @@ import { useFinanceCategoriesStore } from '../stores/financeCategoriesStore'
 import { useLifeAreasStore } from '../stores/lifeAreasStore'
 import { useTasksStore } from '../stores/tasksStore'
 import { useRoutinesStore } from '../stores/routinesStore'
+import { useTopicTemplatesStore } from '../stores/topicTemplatesStore'
 
 /** Kullanıcı oturum açtığında Firestore abonelikleri kurar, çıkışta temizler. */
 export function useUserDataSync(uid: string) {
@@ -17,6 +18,8 @@ export function useUserDataSync(uid: string) {
   const disconnectTasks = useTasksStore((s) => s.disconnect)
   const connectRoutines = useRoutinesStore((s) => s.connect)
   const disconnectRoutines = useRoutinesStore((s) => s.disconnect)
+  const connectTopicTemplates = useTopicTemplatesStore((s) => s.connect)
+  const disconnectTopicTemplates = useTopicTemplatesStore((s) => s.disconnect)
 
   useEffect(() => {
     connectSettings(uid)
@@ -24,12 +27,14 @@ export function useUserDataSync(uid: string) {
     connectLifeAreas(uid)
     connectTasks(uid)
     connectRoutines(uid)
+    connectTopicTemplates(uid)
     return () => {
       disconnectSettings()
       disconnectCategories()
       disconnectLifeAreas()
       disconnectTasks()
       disconnectRoutines()
+      disconnectTopicTemplates()
     }
   }, [
     uid,
@@ -43,5 +48,7 @@ export function useUserDataSync(uid: string) {
     disconnectTasks,
     connectRoutines,
     disconnectRoutines,
+    connectTopicTemplates,
+    disconnectTopicTemplates,
   ])
 }
