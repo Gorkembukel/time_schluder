@@ -38,6 +38,10 @@ export interface Settings {
   appearance: {
     theme: Theme
   }
+  requirements: {
+    /** Boşluk analizinde "ilerlemesi düşük" sayılacak yüzde eşiği (bkz. docs/decisions/0011). */
+    gapProgressThresholdPercent: number
+  }
   reviewRhythms: {
     daily: boolean
     weekly: boolean
@@ -97,6 +101,9 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   appearance: {
     theme: 'system',
+  },
+  requirements: {
+    gapProgressThresholdPercent: 40,
   },
   reviewRhythms: {
     daily: true,

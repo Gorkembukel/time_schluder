@@ -1,16 +1,19 @@
 import {
   addDoc,
+  arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   orderBy,
   query,
   updateDoc,
+  writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { Requirement, RequirementType } from '../../types/domain'
+import type { KnowledgeItem, Requirement, RequirementStatus, RequirementType } from '../../types/domain'
 
 function requirementsCollectionRef(uid: string, areaId: string) {
   return collection(db, 'users', uid, 'lifeAreas', areaId, 'requirements')
@@ -41,6 +44,9 @@ export interface NewRequirementInput {
   parentRequirementId?: string
   /** Bu gerekliliğin bağlı olduğu konu (aynı hayat alanı içinde), opsiyonel. */
   topicId?: string
+  status?: RequirementStatus
+  estimatedCost?: number
+  sourceUrl?: string
 }
 
 export async function createRequirement(
@@ -75,4 +81,66 @@ export async function deleteRequirement(
   requirementId: string,
 ): Promise<void> {
   await deleteDoc(doc(db, 'users', uid, 'lifeAreas', areaId, 'requirements', requirementId))
+}
+
+export interface RequirementDetailsUpdate {
+  status?: RequirementStatus | ''
+  estimatedCost?: number | ''
+  sourceUrl?: string | ''
+}
+
+/** Envanter durumu/tahmini maliyet/kaynak link günceller — boş string (`''`) verilen alan belgeden silinir. */
+export async function updateRequirementDetails(
+  uid: string,
+  areaId: string,
+  requirementId: string,
+  fields: RequirementDetailsUpdate,
+): Promise<void> {
+  const payload: Record<string, unknown> = { updatedAt: new Date().toISOString() }
+  for (const [key, value] of Object.entries(fields)) {
+    payload[key] = value === '' ? deleteField() : value
+  }
+  await updateDoc(
+    doc(db, 'users', uid, 'lifeAreas', areaId, 'requirements', requirementId),
+    payload,
+  )
+}
+
+export interface DerivedRequirementInput {
+  name: string
+  type: RequirementType
+  targetMetric: number
+  currentValue: number
+  unit: string
+  status?: RequirementStatus
+  estimatedCost?: number
+}
+
+/**
+ * Bir deneyim notundan tek adımda gereklilik türetir: yeni gerekliliği notun konusuna/alanına
+ * bağlar (`originNoteId`) ve notun `derivedRequirementIds`'ine ekler — iki yönlü bağ, tek batch
+ * (bkz. docs/decisions/0011).
+ */
+export async function deriveRequirementFromNote(
+  uid: string,
+  areaId: string,
+  note: KnowledgeItem,
+  input: DerivedRequirementInput,
+): Promise<void> {
+  const now = new Date().toISOString()
+  const reqRef = doc(requirementsCollectionRef(uid, areaId))
+  const batch = writeBatch(db)
+  batch.set(reqRef, {
+    ...input,
+    lifeAreaId: areaId,
+    topicId: note.topicId,
+    originNoteId: note.id,
+    createdAt: now,
+    updatedAt: now,
+  })
+  batch.update(doc(db, 'users', uid, 'knowledgeItems', note.id), {
+    derivedRequirementIds: arrayUnion(reqRef.id),
+    updatedAt: now,
+  })
+  await batch.commit()
 }

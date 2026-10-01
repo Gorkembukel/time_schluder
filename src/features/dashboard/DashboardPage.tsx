@@ -15,6 +15,7 @@ import { StatTile } from '../../components/StatTile'
 import { MagnitudeBreakdown } from '../finans/MagnitudeBreakdown'
 import { UpcomingTasksCard } from './UpcomingTasksCard'
 import { LifeAreaProgressCard } from './LifeAreaProgressCard'
+import { GapAnalysisCard } from './GapAnalysisCard'
 import { GuidancePanel } from '../rehber/GuidancePanel'
 
 const ISO_MONTH_LENGTH = 7
@@ -108,6 +109,8 @@ export function DashboardPage() {
         <UpcomingTasksCard tasks={upcomingTasks} loading={tasksLoading} />
         <LifeAreaProgressCard uid={uid} areas={areas} />
       </div>
+
+      <GapAnalysisCard uid={uid} areas={areas} />
 
       <MagnitudeBreakdown
         title="Bu ay kategoriye göre dağılım"

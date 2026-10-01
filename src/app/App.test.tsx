@@ -18,6 +18,7 @@ vi.mock('../services/repositories/settingsRepository', () => ({
         majorChangeThreshold: { affectedTaskCount: 3, criticalPathChanged: true },
       },
       appearance: { theme: 'system' },
+      requirements: { gapProgressThresholdPercent: 40 },
       reviewRhythms: { daily: true, weekly: true, monthly: true, yearly: true },
       dashboard: { upcomingWindowDays: 7 },
     })

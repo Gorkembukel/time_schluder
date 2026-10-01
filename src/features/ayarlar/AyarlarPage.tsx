@@ -39,6 +39,8 @@ const BLOCK_MINUTES_STEP = 15
 const UPCOMING_WINDOW_MIN = 1
 const SCALE_THRESHOLD_MIN = 0
 const SCALE_THRESHOLD_STEP = 0.1
+const PERCENT_MIN = 0
+const PERCENT_MAX = 100
 
 const CANVAS_THRESHOLD_FIELDS = [
   { key: 'year3Days', label: '3 Yıl eşiği (gün)' },
@@ -363,6 +365,20 @@ export function AyarlarPage() {
         <p className="text-sm text-text-secondary">
           Alan ve gereklilik yönetimi Hayat Alanları ekranından yapılır.
         </p>
+        <Field label="Boşluk analizinde 'düşük ilerleme' eşiği (%)">
+          <input
+            type="number"
+            min={PERCENT_MIN}
+            max={PERCENT_MAX}
+            className={inputClass}
+            value={settings.requirements.gapProgressThresholdPercent}
+            onChange={(e) =>
+              void update({
+                requirements: { gapProgressThresholdPercent: Number(e.target.value) },
+              })
+            }
+          />
+        </Field>
       </Section>
 
       <Section title="Finans — Kategoriler">

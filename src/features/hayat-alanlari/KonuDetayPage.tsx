@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Pencil, Plus, Search, Trash2, Waypoints } from 'lucide-react'
+import {
+  ArrowLeft,
+  ExternalLink,
+  Lightbulb,
+  Pencil,
+  Plus,
+  Search,
+  Sparkles,
+  Trash2,
+  Waypoints,
+} from 'lucide-react'
 import { useUid } from '../../app/UidContext'
 import { useLifeAreasStore } from '../../stores/lifeAreasStore'
 import { useTopics } from '../../hooks/useTopics'
@@ -12,13 +22,20 @@ import {
   deleteKnowledgeItem,
   updateKnowledgeItem,
 } from '../../services/repositories/knowledgeItemsRepository'
+import { deriveRequirementFromNote } from '../../services/repositories/requirementsRepository'
 import { KNOWLEDGE_ITEM_TYPE_ICONS, isLinkType } from '../../config/knowledge-item-types'
 import {
   KNOWLEDGE_ITEM_TYPES,
   KNOWLEDGE_ITEM_TYPE_LABELS,
+  REQUIREMENT_STATUSES,
+  REQUIREMENT_STATUS_LABELS,
+  REQUIREMENT_TYPES,
   REQUIREMENT_TYPE_LABELS,
   type KnowledgeItem,
   type KnowledgeItemType,
+  type Requirement,
+  type RequirementStatus,
+  type RequirementType,
 } from '../../types/domain'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
@@ -272,7 +289,9 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
                 <KnowledgeItemCard
                   key={item.id}
                   uid={uid}
+                  areaId={areaId}
                   item={item}
+                  requirements={requirements}
                   crossTopicLabel={
                     query && item.topicId !== topicId
                       ? topics.find((t) => t.id === item.topicId)?.name
@@ -303,7 +322,14 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
                 {topicRequirements.map((r) => (
                   <Card key={r.id} className="min-w-0 p-3">
                     <p className="min-w-0 break-words text-sm text-text">{r.name}</p>
-                    <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[r.type]}</Badge>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      <Badge variant="neutral">{REQUIREMENT_TYPE_LABELS[r.type]}</Badge>
+                      {r.status && (
+                        <Badge variant={r.status === 'yok' ? 'danger' : r.status === 'alinacak' ? 'warning' : 'success'}>
+                          {REQUIREMENT_STATUS_LABELS[r.status]}
+                        </Badge>
+                      )}
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -319,17 +345,26 @@ function KonuDetayInner({ areaId, topicId }: { areaId: string; topicId: string }
 
 function KnowledgeItemCard({
   uid,
+  areaId,
   item,
+  requirements,
   crossTopicLabel,
 }: {
   uid: string
+  areaId: string
   item: KnowledgeItem
+  /** Türetilen gerekliliklerin adını göstermek için — bu alanın tüm gereklilikleri. */
+  requirements: Requirement[]
   crossTopicLabel?: string
 }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [deriving, setDeriving] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const Icon = KNOWLEDGE_ITEM_TYPE_ICONS[item.type]
+  const derivedRequirements = (item.derivedRequirementIds ?? [])
+    .map((id) => requirements.find((r) => r.id === id))
+    .filter((r): r is Requirement => Boolean(r))
 
   if (editing) {
     return (
@@ -342,36 +377,75 @@ function KnowledgeItemCard({
     )
   }
 
+  if (deriving) {
+    return (
+      <DeriveRequirementForm
+        uid={uid}
+        areaId={areaId}
+        note={item}
+        onDone={() => setDeriving(false)}
+      />
+    )
+  }
+
   const header = (
     <div className="flex items-center gap-2">
       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${TYPE_ICON_TINT[item.type]}`}>
         <Icon size={ICON_SIZE} />
       </span>
       <Badge variant="neutral">{KNOWLEDGE_ITEM_TYPE_LABELS[item.type]}</Badge>
+      {item.isExperienceNote && (
+        <Badge variant="warning">
+          <Lightbulb size={ICON_SIZE - 2} />
+          deneyim notu
+        </Badge>
+      )}
       {crossTopicLabel && <Badge variant="primary">{crossTopicLabel}</Badge>}
       {isLinkType(item.type) && <ExternalLink size={ICON_SIZE} className="ml-auto text-text-secondary" />}
     </div>
   )
 
+  const derivedFooter = derivedRequirements.length > 0 && (
+    <div className="flex flex-wrap items-center gap-1 border-t border-dashed border-success/40 pt-2 text-xs text-success">
+      <Sparkles size={ICON_SIZE - 2} />
+      Türedi:
+      {derivedRequirements.map((r) => (
+        <Badge key={r.id} variant="success">
+          {r.name}
+        </Badge>
+      ))}
+    </div>
+  )
+
   const actions = (
-    <div className="mt-2 flex justify-end gap-1">
-      <Button variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label="Düzenle">
-        <Pencil size={ICON_SIZE} />
-      </Button>
-      {confirmingDelete ? (
-        <>
-          <Button variant="danger" size="sm" onClick={() => void deleteKnowledgeItem(uid, item.id)}>
-            Sil
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
-            Vazgeç
-          </Button>
-        </>
-      ) : (
-        <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)} aria-label="Sil">
-          <Trash2 size={ICON_SIZE} />
+    <div className="mt-2 flex items-center justify-between gap-1">
+      {item.isExperienceNote && derivedRequirements.length === 0 ? (
+        <Button variant="ghost" size="sm" onClick={() => setDeriving(true)}>
+          <Sparkles size={ICON_SIZE} />
+          Gerekliliğe dönüştür
         </Button>
+      ) : (
+        <span />
       )}
+      <div className="flex gap-1">
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label="Düzenle">
+          <Pencil size={ICON_SIZE} />
+        </Button>
+        {confirmingDelete ? (
+          <>
+            <Button variant="danger" size="sm" onClick={() => void deleteKnowledgeItem(uid, item.id)}>
+              Sil
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+              Vazgeç
+            </Button>
+          </>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)} aria-label="Sil">
+            <Trash2 size={ICON_SIZE} />
+          </Button>
+        )}
+      </div>
     </div>
   )
 
@@ -383,6 +457,7 @@ function KnowledgeItemCard({
           <p className="min-w-0 break-words text-sm font-semibold text-text">{item.title}</p>
           <p className="min-w-0 truncate text-xs text-text-secondary">{hostnameOf(item.body)}</p>
         </a>
+        {derivedFooter}
         {actions}
       </Card>
     )
@@ -403,7 +478,130 @@ function KnowledgeItemCard({
           {item.body}
         </p>
       </button>
+      {derivedFooter}
       {actions}
+    </Card>
+  )
+}
+
+function DeriveRequirementForm({
+  uid,
+  areaId,
+  note,
+  onDone,
+}: {
+  uid: string
+  areaId: string
+  note: KnowledgeItem
+  onDone: () => void
+}) {
+  const [name, setName] = useState(note.title)
+  const [type, setType] = useState<RequirementType>('varlik-arac')
+  const [status, setStatus] = useState<RequirementStatus | ''>('alinacak')
+  const [targetMetric, setTargetMetric] = useState('1')
+  const [unit, setUnit] = useState('')
+  const [estimatedCost, setEstimatedCost] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    nameRef.current?.focus()
+  }, [])
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    const trimmedName = name.trim()
+    if (!trimmedName) return
+    await deriveRequirementFromNote(uid, areaId, note, {
+      name: trimmedName,
+      type,
+      targetMetric: Number(targetMetric) || 0,
+      currentValue: 0,
+      unit: unit.trim(),
+      status: status || undefined,
+      estimatedCost: estimatedCost === '' ? undefined : Number(estimatedCost),
+    })
+    onDone()
+  }
+
+  return (
+    <Card className="flex flex-col gap-2 border-warning/30 bg-warning/5 p-4">
+      <p className="text-xs text-text-secondary">
+        Kaynak not: <span className="font-medium text-text">{note.title}</span>
+      </p>
+      <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-wrap items-end gap-2">
+        <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-text-secondary">
+          Gereklilik adı
+          <input
+            ref={nameRef}
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-text-secondary">
+          Tür
+          <select value={type} onChange={(e) => setType(e.target.value as RequirementType)} className={inputClass}>
+            {REQUIREMENT_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {REQUIREMENT_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-text-secondary">
+          Durum
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as RequirementStatus | '')}
+            className={inputClass}
+          >
+            <option value="">—</option>
+            {REQUIREMENT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {REQUIREMENT_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-text-secondary">
+          Hedef
+          <input
+            type="number"
+            min={0}
+            value={targetMetric}
+            onChange={(e) => setTargetMetric(e.target.value)}
+            className={`${inputClass} w-20`}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-text-secondary">
+          Birim
+          <input
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder="ör. adet"
+            className={`${inputClass} w-24`}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-text-secondary">
+          Tahmini maliyet (TRY)
+          <input
+            type="number"
+            min={0}
+            value={estimatedCost}
+            onChange={(e) => setEstimatedCost(e.target.value)}
+            placeholder="opsiyonel"
+            className={`${inputClass} w-28`}
+          />
+        </label>
+        <Button type="submit" variant="primary" size="sm">
+          <Sparkles size={ICON_SIZE} />
+          Gereklilik oluştur
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onDone}>
+          Vazgeç
+        </Button>
+      </form>
     </Card>
   )
 }
@@ -422,6 +620,7 @@ function NewKnowledgeItemForm({
   const [type, setType] = useState<KnowledgeItemType>(initial?.type ?? 'not')
   const [title, setTitle] = useState(initial?.title ?? '')
   const [body, setBody] = useState(initial?.body ?? '')
+  const [isExperienceNote, setIsExperienceNote] = useState(initial?.isExperienceNote ?? false)
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -435,9 +634,20 @@ function NewKnowledgeItemForm({
     if (!trimmedTitle || !trimmedBody) return
 
     if (initial) {
-      await updateKnowledgeItem(uid, initial.id, { type, title: trimmedTitle, body: trimmedBody })
+      await updateKnowledgeItem(uid, initial.id, {
+        type,
+        title: trimmedTitle,
+        body: trimmedBody,
+        isExperienceNote,
+      })
     } else {
-      await createKnowledgeItem(uid, { type, title: trimmedTitle, body: trimmedBody, topicId })
+      await createKnowledgeItem(uid, {
+        type,
+        title: trimmedTitle,
+        body: trimmedBody,
+        topicId,
+        isExperienceNote,
+      })
     }
     onDone()
   }
@@ -474,6 +684,14 @@ function NewKnowledgeItemForm({
             placeholder={isLinkType(type) ? 'https://…' : 'Not metni'}
             className={`${inputClass} min-h-10 resize-y`}
           />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+          <input
+            type="checkbox"
+            checked={isExperienceNote}
+            onChange={(e) => setIsExperienceNote(e.target.checked)}
+          />
+          Bu bir deneyim notu
         </label>
         <Button type="submit" variant="primary" size="sm">
           {initial ? 'Kaydet' : 'Ekle'}
